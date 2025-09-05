@@ -1,39 +1,27 @@
-// Pin del sensor
-const int sensorPin = A0;
-
-// Variable para almacenar la lectura
-int lecturaSensor = 0;
-
-// Variable para almacenar el VWC calculado
-float humedadVWC = 0.0;
-
 void setup() {
-  Serial.begin(9600);
+  Serial.begin(9600); // Inicia la comunicación serial
 }
 
 void loop() {
-  // Leer el valor analÃ³gico del sensor
-  lecturaSensor = analogRead(sensorPin);
+  int lectura = analogRead(A0); // Lee el valor del sensor en el pin A0 (o el pin donde esté conectado tu sensor)
 
-  // Calcular el % de humedad (VWC) usando la fÃ³rmula de calibraciÃ³n
-  // y = 1196.1xÂ² - 2216.6x + 1141.5
-  float x = lecturaSensor;
-  humedadVWC = 1196.1 * pow(x, 2) - 2216.6 * x + 1141.5;
+  // Calibración usando la fórmula de segundo grado para lecturas >= 157.6
+  // VWC (%) = -0.000049 * (x)^2 - 0.0016 * (x) + 47.9
+  // Usamos 'lectura' como 'x' en la fórmula
 
-  // Evitar valores negativos o excesivos
-  if (humedadVWC < 0) {
-    humedadVWC = 0;
-  }
-  if (humedadVWC > 100) {
-    humedadVWC = 100;
+  // Es importante usar 'float' para los cálculos para mantener la precisión
+  float VWC_calculado = -0.000049 * pow(lectura, 2) - 0.0016 * lectura + 47.9;
+
+  // Interpretar valores negativos como 0% VWC
+  if (VWC_calculado < 0) {
+    VWC_calculado = 0;
   }
 
-  // Mostrar los resultados por Serial
-  Serial.print("Lectura analogica: ");
-  Serial.print(lecturaSensor);
-  Serial.print(" | Humedad estimada (VWC %): ");
-  Serial.println(humedadVWC);
+  // Muestra en el Monitor Serial
+  Serial.print("Lectura (0-1023): ");
+  Serial.print(lectura);
+  Serial.print(" -> %VWC: ");
+  Serial.println(VWC_calculado, 2); // Muestra con 2 decimales
 
-  // Esperar 4 segundos
-  delay(4000);
+  delay(1000); // Espera 1 segundo antes de la siguiente lectura
 }
