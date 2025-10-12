@@ -11,7 +11,7 @@ El sistema está diseñado como una **Progressive Web App (PWA)** con una arquit
 ## 🎯 Características Principales
 
 * **Monitoreo en Tiempo Real:** Visualiza la humedad y temperatura de los sensores instalados en el cultivo.
-* **Arquitectura Offline-First:** La aplicación es 100% funcional sin conexión a internet. Los datos se guardan localmente y se sincronizan automáticamente cuando se recupera la conexión.
+* **Arquitectura Offline-First:** La aplicación busca brindar funcionalidad en casos de precaria conexión a internet. Los datos se guardan localmente y se sincronizan automáticamente cuando se recupera la conexión.
 * **Control de Riego Dual:** Permite activar o desactivar el riego de forma **manual** desde la app, o dejar que el sistema lo gestione de forma **automática** basado en umbrales de humedad.
 * **Riego Inteligente:** El sistema consulta el **pronóstico del clima** para evitar riegos innecesarios si hay una alta probabilidad de lluvia.
 * **Historial y Analítica:** Visualiza gráficos con la evolución de las métricas históricas del riego a lo largo del tiempo.
@@ -97,3 +97,4 @@ Instrucciones para configurar y ejecutar el proyecto en un entorno de desarrollo
 * **Daniel Sebastián Bello Hernández**
 * **Jorge Alberto Roncancio Enciso**
 * **Samuel David Gómez Piamba**
+
