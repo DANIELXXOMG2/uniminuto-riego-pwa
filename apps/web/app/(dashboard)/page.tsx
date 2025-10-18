@@ -2,14 +2,31 @@
 
 import { useState } from 'react';
 import IrrigationLineCard from '@/components/ui/IrrigationLineCard';
-import { WifiOff, Droplets } from 'lucide-react';
+import { WifiOff, Droplets, CheckCircle, XCircle } from 'lucide-react';
 import { useIrrigationData } from '@/lib/useIrrigationData';
 import { doc, updateDoc } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 
+interface Toast {
+  id: number;
+  message: string;
+  type: 'success' | 'error';
+}
+
 export default function DashboardPage() {
   const [isOffline] = useState(false); // Simular modo offline
   const { lines, loading, error } = useIrrigationData();
+  const [toasts, setToasts] = useState<Toast[]>([]);
+
+  const showToast = (message: string, type: 'success' | 'error') => {
+    const id = Date.now();
+    setToasts((prev) => [...prev, { id, message, type }]);
+    
+    // Auto-eliminar después de 3 segundos
+    setTimeout(() => {
+      setToasts((prev) => prev.filter((toast) => toast.id !== id));
+    }, 3000);
+  };
 
   const handleToggleLine = async (id: string, checked: boolean) => {
     try {
@@ -17,8 +34,24 @@ export default function DashboardPage() {
       await updateDoc(lineRef, {
         isActive: checked,
       });
+      
+      // Mostrar notificación de éxito
+      showToast(
+        `Línea ${checked ? 'activada' : 'desactivada'} correctamente`,
+        'success'
+      );
     } catch (err) {
       console.error('Error al actualizar línea de riego:', err);
+      
+      // Mostrar notificación de error
+      const errorMessage = err instanceof Error 
+        ? err.message 
+        : 'Error al actualizar la línea de riego';
+      
+      showToast(
+        `Error: ${errorMessage}. Por favor, intenta de nuevo.`,
+        'error'
+      );
     }
   };
 
@@ -97,6 +130,27 @@ export default function DashboardPage() {
 
   return (
     <div className="space-y-6">
+      {/* Sistema de Notificaciones Toast */}
+      <div className="fixed top-4 right-4 z-50 space-y-2">
+        {toasts.map((toast) => (
+          <div
+            key={toast.id}
+            className={`flex items-center gap-3 px-4 py-3 rounded-lg shadow-lg animate-in slide-in-from-right duration-300 ${
+              toast.type === 'success'
+                ? 'bg-green-500 text-white'
+                : 'bg-red-500 text-white'
+            }`}
+          >
+            {toast.type === 'success' ? (
+              <CheckCircle className="w-5 h-5 flex-shrink-0" />
+            ) : (
+              <XCircle className="w-5 h-5 flex-shrink-0" />
+            )}
+            <p className="text-sm font-medium">{toast.message}</p>
+          </div>
+        ))}
+      </div>
+
       {/* Banner de Modo sin Conexión */}
       {isOffline && (
         <div className="bg-orange-500 text-white px-4 py-3 rounded-lg shadow-md">
