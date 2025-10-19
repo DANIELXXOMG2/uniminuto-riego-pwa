@@ -3,7 +3,7 @@
 
 import { initializeApp } from 'firebase/app';
 import { getAuth } from 'firebase/auth';
-import { getFirestore } from 'firebase/firestore';
+import { getFirestore, enableIndexedDbPersistence } from 'firebase/firestore';
 
 const firebaseConfig = {
   apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
@@ -20,5 +20,26 @@ const app = initializeApp(firebaseConfig);
 // Servicios de Firebase
 export const auth = getAuth(app);
 export const db = getFirestore(app);
+
+// Habilitar persistencia offline de Firestore
+// Esto permite que la aplicación lea y escriba datos incluso sin conexión
+// Las operaciones se encolarán y se sincronizarán automáticamente cuando se restablezca la conexión
+if (typeof window !== 'undefined') {
+  enableIndexedDbPersistence(db)
+    .then(() => {
+      console.log('✅ Persistencia offline de Firestore habilitada correctamente');
+    })
+    .catch((err) => {
+      if (err.code === 'failed-precondition') {
+        // Múltiples pestañas abiertas: la persistencia solo puede estar habilitada en una pestaña a la vez
+        console.warn('⚠️ Persistencia offline: múltiples pestañas detectadas. Solo funciona en una pestaña.');
+      } else if (err.code === 'unimplemented') {
+        // El navegador actual no soporta todas las características necesarias
+        console.warn('⚠️ Persistencia offline: navegador no compatible con todas las características necesarias.');
+      } else {
+        console.error('❌ Error al habilitar persistencia offline de Firestore:', err);
+      }
+    });
+}
 
 export default app;
