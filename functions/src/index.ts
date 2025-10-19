@@ -1,6 +1,6 @@
 /**
  * Firebase Cloud Functions para Sistema de Riego Inteligente
- * 
+ *
  * Funciones incluidas:
  * 1. onLowHumidityAlert - Notifica cuando la humedad baja del umbral
  * 2. onSensorFailure - Detecta sensores que no reportan (ejecuta cada hora)
@@ -42,7 +42,7 @@ interface IrrigationLine {
  */
 async function getAdminTokens(): Promise<string[]> {
   const tokens: string[] = [];
-  
+
   try {
     const usersSnapshot = await admin.firestore()
       .collection("users")
@@ -65,6 +65,8 @@ async function getAdminTokens(): Promise<string[]> {
 
 /**
  * Limpiar tokens inválidos de Firestore
+ * @param {string[]} invalidTokens - Array de tokens inválidos a limpiar
+ * @param {FirebaseFirestore.QuerySnapshot} userDocs - Snapshot de usuarios
  */
 async function cleanInvalidTokens(
   invalidTokens: string[],
@@ -94,7 +96,7 @@ async function cleanInvalidTokens(
 
 /**
  * 1. FUNCIÓN: Notificar Humedad Baja
- * 
+ *
  * Se activa cuando se actualiza un documento en irrigationLines
  * Verifica si la humedad cruza por debajo del umbral crítico
  */
@@ -115,10 +117,16 @@ export const onLowHumidityAlert = onDocumentUpdated(
       const afterHumidity = afterData.humidity;
       const lineTitle = afterData.title || `Línea ${lineId}`;
 
-      logger.info(`Humidity changed for ${lineTitle}: ${beforeHumidity}% → ${afterHumidity}%`);
+      logger.info(
+        `Humidity changed for ${lineTitle}: ` +
+        `${beforeHumidity}% → ${afterHumidity}%`
+      );
 
       // Verificar si la humedad cruzó por debajo del umbral
-      if (beforeHumidity >= HUMIDITY_THRESHOLD && afterHumidity < HUMIDITY_THRESHOLD) {
+      if (
+        beforeHumidity >= HUMIDITY_THRESHOLD &&
+        afterHumidity < HUMIDITY_THRESHOLD
+      ) {
         logger.info(`🚨 Low humidity alert triggered for ${lineTitle}`);
 
         // Obtener tokens de administradores
@@ -133,7 +141,8 @@ export const onLowHumidityAlert = onDocumentUpdated(
         const message: admin.messaging.MulticastMessage = {
           notification: {
             title: "⚠️ Alerta de Humedad Baja",
-            body: `${lineTitle} tiene ${afterHumidity}% de humedad (crítico)`,
+            body:
+              `${lineTitle} tiene ${afterHumidity}% de humedad (crítico)`,
           },
           data: {
             type: "low_humidity",
@@ -147,9 +156,13 @@ export const onLowHumidityAlert = onDocumentUpdated(
         };
 
         // Enviar notificación
-        const response = await admin.messaging().sendEachForMulticast(message);
-        
-        logger.info(`✅ Notifications sent: ${response.successCount} successful, ${response.failureCount} failed`);
+        const response =
+          await admin.messaging().sendEachForMulticast(message);
+
+        logger.info(
+          `✅ Notifications sent: ${response.successCount} successful, ` +
+          `${response.failureCount} failed`
+        );
 
         // Limpiar tokens inválidos
         if (response.failureCount > 0) {
@@ -159,7 +172,8 @@ export const onLowHumidityAlert = onDocumentUpdated(
               const error = resp.error;
               if (
                 error?.code === "messaging/invalid-registration-token" ||
-                error?.code === "messaging/registration-token-not-registered"
+                error?.code ===
+                  "messaging/registration-token-not-registered"
               ) {
                 invalidTokens.push(tokens[idx]);
               }
@@ -183,7 +197,7 @@ export const onLowHumidityAlert = onDocumentUpdated(
 
 /**
  * 2. FUNCIÓN: Notificar Cambio de Estado de Riego
- * 
+ *
  * Se activa cuando se actualiza el estado isActive de una línea
  */
 export const onIrrigationStatusChange = onDocumentUpdated(
@@ -208,7 +222,10 @@ export const onIrrigationStatusChange = onDocumentUpdated(
         return;
       }
 
-      logger.info(`Irrigation status changed for ${lineTitle}: ${beforeActive} → ${afterActive}`);
+      logger.info(
+        `Irrigation status changed for ${lineTitle}: ` +
+        `${beforeActive} → ${afterActive}`
+      );
 
       // Obtener tokens de administradores
       const tokens = await getAdminTokens();
@@ -219,13 +236,13 @@ export const onIrrigationStatusChange = onDocumentUpdated(
       }
 
       // Preparar mensaje según el estado
-      const title = afterActive 
-        ? "💧 Riego Activado" 
-        : "⏸️ Riego Desactivado";
-      
-      const body = afterActive
-        ? `${lineTitle} ha iniciado el riego automático`
-        : `${lineTitle} ha detenido el riego`;
+      const title = afterActive ?
+        "💧 Riego Activado" :
+        "⏸️ Riego Desactivado";
+
+      const body = afterActive ?
+        `${lineTitle} ha iniciado el riego automático` :
+        `${lineTitle} ha detenido el riego`;
 
       const message: admin.messaging.MulticastMessage = {
         notification: {
@@ -233,7 +250,8 @@ export const onIrrigationStatusChange = onDocumentUpdated(
           body,
         },
         data: {
-          type: afterActive ? "irrigation_started" : "irrigation_stopped",
+          type:
+            afterActive ? "irrigation_started" : "irrigation_stopped",
           lineId: lineId,
           lineName: lineTitle,
           isActive: afterActive.toString(),
@@ -244,9 +262,13 @@ export const onIrrigationStatusChange = onDocumentUpdated(
       };
 
       // Enviar notificación
-      const response = await admin.messaging().sendEachForMulticast(message);
-      
-      logger.info(`✅ Notifications sent: ${response.successCount} successful, ${response.failureCount} failed`);
+      const response =
+        await admin.messaging().sendEachForMulticast(message);
+
+      logger.info(
+        `✅ Notifications sent: ${response.successCount} successful, ` +
+        `${response.failureCount} failed`
+      );
 
       // Limpiar tokens inválidos
       if (response.failureCount > 0) {
@@ -279,7 +301,7 @@ export const onIrrigationStatusChange = onDocumentUpdated(
 
 /**
  * 3. FUNCIÓN: Detectar Fallo de Sensores
- * 
+ *
  * Se ejecuta cada hora para verificar sensores que no reportan
  * Programada con Cloud Scheduler
  */
@@ -300,7 +322,11 @@ export const onSensorFailureCheck = onSchedule(
         .collection("irrigationLines")
         .get();
 
-      const failedSensors: Array<{id: string; title: string; lastUpdate: number}> = [];
+      const failedSensors: Array<{
+        id: string;
+        title: string;
+        lastUpdate: number;
+      }> = [];
 
       linesSnapshot.forEach((doc) => {
         const data = doc.data();
@@ -332,12 +358,15 @@ export const onSensorFailureCheck = onSchedule(
 
       // Enviar notificación por cada sensor fallido
       for (const sensor of failedSensors) {
-        const timeSinceUpdate = Math.floor((now - sensor.lastUpdate) / (60 * 1000)); // en minutos
-        
+        const timeSinceUpdate =
+          Math.floor((now - sensor.lastUpdate) / (60 * 1000));
+
         const message: admin.messaging.MulticastMessage = {
           notification: {
             title: "🚨 Posible Fallo de Sensor",
-            body: `${sensor.title} no reporta desde hace ${timeSinceUpdate} minutos`,
+            body:
+              `${sensor.title} no reporta desde hace ` +
+              `${timeSinceUpdate} minutos`,
           },
           data: {
             type: "sensor_failure",
@@ -350,8 +379,12 @@ export const onSensorFailureCheck = onSchedule(
           tokens: tokens,
         };
 
-        const response = await admin.messaging().sendEachForMulticast(message);
-        logger.info(`Sensor failure notification for ${sensor.title}: ${response.successCount} sent`);
+        const response =
+          await admin.messaging().sendEachForMulticast(message);
+        logger.info(
+          `Sensor failure notification for ${sensor.title}: ` +
+          `${response.successCount} sent`
+        );
       }
 
       logger.info("✅ Sensor failure check completed");
@@ -363,13 +396,13 @@ export const onSensorFailureCheck = onSchedule(
 
 /**
  * 4. FUNCIÓN DE PRUEBA: Enviar Notificación Manual
- * 
+ *
  * Función HTTP para probar el envío de notificaciones
- * Acceso: https://[region]-[project-id].cloudfunctions.net/sendTestNotification
+ * Acceso: Manual invocation or scheduled fallback
  */
 export const sendTestNotification = onSchedule(
   {
-    schedule: "every 24 hours", // Solo como fallback, se puede invocar manualmente
+    schedule: "every 24 hours",
   },
   async () => {
     try {
@@ -385,7 +418,8 @@ export const sendTestNotification = onSchedule(
       const message: admin.messaging.MulticastMessage = {
         notification: {
           title: "🧪 Notificación de Prueba",
-          body: "El sistema de notificaciones está funcionando correctamente",
+          body:
+            "El sistema de notificaciones está funcionando correctamente",
         },
         data: {
           type: "test",
@@ -394,8 +428,11 @@ export const sendTestNotification = onSchedule(
         tokens: tokens,
       };
 
-      const response = await admin.messaging().sendEachForMulticast(message);
-      logger.info(`✅ Test notifications sent: ${response.successCount} successful`);
+      const response =
+        await admin.messaging().sendEachForMulticast(message);
+      logger.info(
+        `✅ Test notifications sent: ${response.successCount} successful`
+      );
     } catch (error) {
       logger.error("Error sending test notification:", error);
     }

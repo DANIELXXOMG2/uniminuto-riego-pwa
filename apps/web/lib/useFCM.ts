@@ -104,13 +104,21 @@ export function useFCM(onNotificationReceived?: NotificationHandler): UseFCMResu
         const registration = await navigator.serviceWorker.register('/firebase-messaging-sw.js');
         console.log('✅ Service Worker de FCM registrado');
 
+        // Verificar que el Service Worker esté activo
+        if (!registration || !registration.active) {
+          setError("El Service Worker de notificaciones no está activo. Intenta recargar la página.");
+          setLoading(false);
+          console.error("FCM Error: Service Worker not active.", registration);
+          return; // Detener si no está activo
+        }
+
         // Obtener instancia de messaging
         const messaging = getMessaging();
 
         // Obtener token FCM
         const fcmToken = await getToken(messaging, {
           vapidKey: VAPID_KEY,
-          serviceWorkerRegistration: registration,
+          serviceWorkerRegistration: registration, // Usar el registration validado
         });
 
         if (fcmToken) {
