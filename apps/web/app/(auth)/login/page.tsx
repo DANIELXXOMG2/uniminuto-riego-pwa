@@ -3,7 +3,8 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { signInWithEmailAndPassword } from 'firebase/auth';
-import { auth } from '@/lib/firebase';
+import { setDoc, doc } from 'firebase/firestore';
+import { auth, db } from '@/lib/firebase';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Droplets } from 'lucide-react';
@@ -23,6 +24,17 @@ export default function LoginPage() {
     try {
       // Autenticar con Firebase
       await signInWithEmailAndPassword(auth, email, password);
+      
+      // Asegurar que el documento del usuario exista en Firestore
+      const userCred = auth.currentUser; // Obtener el usuario recién logueado
+      if (userCred) {
+        const userRef = doc(db, "users", userCred.uid);
+        await setDoc(userRef, {
+          email: userCred.email, // Guardar el email
+          // No establecemos el rol aquí, se hará manualmente o por otra función
+        }, { merge: true }); // merge: true evita sobrescribir si ya existe
+      }
+      
       // Si es exitoso, redirigir al dashboard
       router.push('/');
     } catch (err: unknown) {
