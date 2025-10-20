@@ -1,8 +1,8 @@
-'use client';
+"use client";
 
-import { Card, CardContent, CardHeader } from '@/components/ui/card';
-import { Switch } from '@/components/ui/switch';
-import { Droplet, Activity } from 'lucide-react';
+import { Card, CardContent, CardHeader } from "@/components/ui/card";
+import { Switch } from "@/components/ui/switch";
+import { Droplet, Activity } from "lucide-react";
 
 interface IrrigationLineCardProps {
   title: string;
@@ -22,15 +22,23 @@ export default function IrrigationLineCard({
       <CardHeader className="pb-3">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <div className={`p-2 rounded-lg ${isActive ? 'bg-blue-100' : 'bg-gray-100'}`}>
-              <Droplet className={`w-5 h-5 ${isActive ? 'text-blue-600' : 'text-gray-400'}`} />
+            <div
+              className={`p-2 rounded-lg ${isActive ? "bg-blue-100" : "bg-gray-100"}`}
+            >
+              <Droplet
+                className={`w-5 h-5 ${isActive ? "text-blue-600" : "text-gray-400"}`}
+              />
             </div>
             <div>
               <h3 className="font-semibold text-gray-900">{title}</h3>
               <div className="flex items-center gap-1.5 mt-0.5">
-                <Activity className={`w-3.5 h-3.5 ${isActive ? 'text-green-500' : 'text-gray-400'}`} />
-                <span className={`text-xs font-medium ${isActive ? 'text-green-600' : 'text-gray-500'}`}>
-                  {isActive ? 'Regando' : 'Detenida'}
+                <Activity
+                  className={`w-3.5 h-3.5 ${isActive ? "text-green-500" : "text-gray-400"}`}
+                />
+                <span
+                  className={`text-xs font-medium ${isActive ? "text-green-600" : "text-gray-500"}`}
+                >
+                  {isActive ? "Regando" : "Detenida"}
                 </span>
               </div>
             </div>
@@ -49,7 +57,9 @@ export default function IrrigationLineCard({
             <span className="text-4xl font-bold text-blue-900">{humidity}</span>
             <span className="text-2xl font-semibold text-blue-700">%</span>
           </div>
-          <p className="text-sm text-gray-600 mt-1 font-medium">Humedad Promedio</p>
+          <p className="text-sm text-gray-600 mt-1 font-medium">
+            Humedad Promedio
+          </p>
         </div>
 
         {/* Información adicional */}

@@ -1,67 +1,74 @@
-'use client';
+"use client";
 
-import { useState } from 'react';
-import { useRouter } from 'next/navigation';
-import { signInWithEmailAndPassword } from 'firebase/auth';
-import { setDoc, doc } from 'firebase/firestore';
-import { auth, db } from '@/lib/firebase';
-import { Input } from '@/components/ui/input';
-import { Button } from '@/components/ui/button';
-import { Droplets } from 'lucide-react';
+import { useState } from "react";
+import { useRouter } from "next/navigation";
+import { signInWithEmailAndPassword } from "firebase/auth";
+import { setDoc, doc } from "firebase/firestore";
+import { auth, db } from "@/lib/firebase";
+import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
+import { Droplets } from "lucide-react";
 
 export default function LoginPage() {
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
   const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState('');
+  const [error, setError] = useState("");
   const router = useRouter();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
-    setError(''); // Limpiar errores previos
+    setError(""); // Limpiar errores previos
 
     try {
       // Autenticar con Firebase
       await signInWithEmailAndPassword(auth, email, password);
-      
+
       // Asegurar que el documento del usuario exista en Firestore
       const userCred = auth.currentUser; // Obtener el usuario recién logueado
       if (userCred) {
         const userRef = doc(db, "users", userCred.uid);
-        await setDoc(userRef, {
-          email: userCred.email, // Guardar el email
-          // No establecemos el rol aquí, se hará manualmente o por otra función
-        }, { merge: true }); // merge: true evita sobrescribir si ya existe
+        await setDoc(
+          userRef,
+          {
+            email: userCred.email, // Guardar el email
+            // No establecemos el rol aquí, se hará manualmente o por otra función
+          },
+          { merge: true }
+        ); // merge: true evita sobrescribir si ya existe
       }
-      
+
       // Si es exitoso, redirigir al dashboard
-      router.push('/');
+      router.push("/");
     } catch (err: unknown) {
       // Capturar y mostrar errores
-      console.error('Error al iniciar sesión:', err);
-      
+      console.error("Error al iniciar sesión:", err);
+
       // Personalizar mensajes de error según el código de Firebase
-      let errorMessage = 'Error al iniciar sesión. Por favor, intenta de nuevo.';
-      
-      if (err && typeof err === 'object' && 'code' in err) {
+      let errorMessage =
+        "Error al iniciar sesión. Por favor, intenta de nuevo.";
+
+      if (err && typeof err === "object" && "code" in err) {
         const firebaseError = err as { code: string };
-        
-        if (firebaseError.code === 'auth/user-not-found') {
-          errorMessage = 'No existe una cuenta con este correo electrónico.';
-        } else if (firebaseError.code === 'auth/wrong-password') {
-          errorMessage = 'Contraseña incorrecta.';
-        } else if (firebaseError.code === 'auth/invalid-email') {
-          errorMessage = 'El correo electrónico no es válido.';
-        } else if (firebaseError.code === 'auth/user-disabled') {
-          errorMessage = 'Esta cuenta ha sido deshabilitada.';
-        } else if (firebaseError.code === 'auth/too-many-requests') {
-          errorMessage = 'Demasiados intentos fallidos. Por favor, intenta más tarde.';
-        } else if (firebaseError.code === 'auth/invalid-credential') {
-          errorMessage = 'Credenciales inválidas. Verifica tu correo y contraseña.';
+
+        if (firebaseError.code === "auth/user-not-found") {
+          errorMessage = "No existe una cuenta con este correo electrónico.";
+        } else if (firebaseError.code === "auth/wrong-password") {
+          errorMessage = "Contraseña incorrecta.";
+        } else if (firebaseError.code === "auth/invalid-email") {
+          errorMessage = "El correo electrónico no es válido.";
+        } else if (firebaseError.code === "auth/user-disabled") {
+          errorMessage = "Esta cuenta ha sido deshabilitada.";
+        } else if (firebaseError.code === "auth/too-many-requests") {
+          errorMessage =
+            "Demasiados intentos fallidos. Por favor, intenta más tarde.";
+        } else if (firebaseError.code === "auth/invalid-credential") {
+          errorMessage =
+            "Credenciales inválidas. Verifica tu correo y contraseña.";
         }
       }
-      
+
       setError(errorMessage);
     } finally {
       setIsLoading(false);
@@ -86,7 +93,10 @@ export default function LoginPage() {
         <div className="bg-white rounded-lg shadow-lg p-8 space-y-6">
           <form onSubmit={handleSubmit} className="space-y-4">
             <div className="space-y-2">
-              <label htmlFor="email" className="text-sm font-medium text-gray-700">
+              <label
+                htmlFor="email"
+                className="text-sm font-medium text-gray-700"
+              >
                 Email
               </label>
               <Input
@@ -101,7 +111,10 @@ export default function LoginPage() {
             </div>
 
             <div className="space-y-2">
-              <label htmlFor="password" className="text-sm font-medium text-gray-700">
+              <label
+                htmlFor="password"
+                className="text-sm font-medium text-gray-700"
+              >
                 Contraseña
               </label>
               <Input
@@ -120,7 +133,7 @@ export default function LoginPage() {
               className="w-full bg-blue-600 hover:bg-blue-700"
               disabled={isLoading}
             >
-              {isLoading ? 'Iniciando sesión...' : 'Iniciar Sesión'}
+              {isLoading ? "Iniciando sesión..." : "Iniciar Sesión"}
             </Button>
 
             {/* Mensaje de error */}

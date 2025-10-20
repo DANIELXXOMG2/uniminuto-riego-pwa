@@ -5,6 +5,7 @@ Sistema de Riego Automatizado desarrollado con Next.js 14+ y Firebase.
 ## 🚀 Inicio Rápido
 
 ### Prerrequisitos
+
 - Bun instalado
 - Node.js 18+
 - Cuenta de Firebase
@@ -20,11 +21,13 @@ bun install
 ### Configuración de Firebase
 
 1. Copia el archivo de ejemplo de variables de entorno:
+
 ```bash
 cp .env.local.example .env.local
 ```
 
 2. Edita `.env.local` y completa con tus credenciales de Firebase:
+
 ```env
 NEXT_PUBLIC_FIREBASE_API_KEY=tu_api_key
 NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN=tu_proyecto.firebaseapp.com
@@ -74,12 +77,14 @@ Abre [http://localhost:3000](http://localhost:3000) en tu navegador.
 ### Pantallas
 
 #### Login (`/(auth)/login/page.tsx`)
+
 - Formulario de inicio de sesión mobile-first
 - Campos de email y contraseña
 - Diseño centrado con logo y branding de UNIMINUTO
 - Validación de formularios
 
 #### Dashboard (`/(dashboard)/page.tsx`)
+
 - Vista principal del sistema
 - Banner de modo sin conexión (cuando aplique)
 - Estadísticas rápidas (Total líneas, Activas, Inactivas, Humedad promedio)
@@ -89,7 +94,9 @@ Abre [http://localhost:3000](http://localhost:3000) en tu navegador.
 ### Componentes Reutilizables
 
 #### IrrigationLineCard
+
 Tarjeta que muestra información de cada línea de riego:
+
 - Título de la línea
 - Estado visual (Regando/Detenida)
 - Valor grande de humedad promedio
@@ -98,6 +105,7 @@ Tarjeta que muestra información de cada línea de riego:
 - Animaciones y transiciones suaves
 
 #### Layout del Dashboard
+
 - Navbar superior sticky con:
   - Logo de UNIMINUTO Riego
   - Botón de menú (móvil)
@@ -150,4 +158,3 @@ Tarjeta que muestra información de cada línea de riego:
 ## 📄 Licencia
 
 MIT
-

@@ -1,4 +1,4 @@
-'use client';
+"use client";
 
 import { Search, FilePen, Trash2, AlertCircle } from "lucide-react";
 import { Input } from "@/components/ui/input";
@@ -32,7 +32,9 @@ export default function AdminPage() {
             <div className="flex items-center gap-3">
               <AlertCircle className="h-5 w-5 text-destructive" />
               <div>
-                <p className="font-medium text-destructive">Error al cargar usuarios</p>
+                <p className="font-medium text-destructive">
+                  Error al cargar usuarios
+                </p>
                 <p className="text-sm text-destructive/80">{error}</p>
               </div>
             </div>
@@ -64,16 +66,18 @@ export default function AdminPage() {
           <div className="space-y-3">
             {users.length === 0 ? (
               <Card className="p-8 text-center">
-                <p className="text-muted-foreground">No hay usuarios registrados</p>
+                <p className="text-muted-foreground">
+                  No hay usuarios registrados
+                </p>
               </Card>
             ) : (
               users.map((user) => (
                 <Card key={user.id} className="p-4">
                   <div className="flex items-center justify-between">
                     <div className="flex-1">
-                      <p className="font-medium">{user.email || 'Sin email'}</p>
+                      <p className="font-medium">{user.email || "Sin email"}</p>
                       <p className="text-sm text-muted-foreground">
-                        {user.role || 'Sin rol asignado'}
+                        {user.role || "Sin rol asignado"}
                       </p>
                     </div>
                     <div className="flex gap-2">

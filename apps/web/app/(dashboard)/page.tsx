@@ -1,16 +1,16 @@
-'use client';
+"use client";
 
-import { useState } from 'react';
-import IrrigationLineCard from '@/components/ui/IrrigationLineCard';
-import { WifiOff, Droplets, CheckCircle, XCircle } from 'lucide-react';
-import { useIrrigationData } from '@/lib/useIrrigationData';
-import { doc, updateDoc } from 'firebase/firestore';
-import { db } from '@/lib/firebase';
+import { useState } from "react";
+import IrrigationLineCard from "@/components/ui/IrrigationLineCard";
+import { WifiOff, Droplets, CheckCircle, XCircle } from "lucide-react";
+import { useIrrigationData } from "@/lib/useIrrigationData";
+import { doc, updateDoc } from "firebase/firestore";
+import { db } from "@/lib/firebase";
 
 interface Toast {
   id: number;
   message: string;
-  type: 'success' | 'error';
+  type: "success" | "error";
 }
 
 export default function DashboardPage() {
@@ -18,10 +18,10 @@ export default function DashboardPage() {
   const { lines, loading, error } = useIrrigationData();
   const [toasts, setToasts] = useState<Toast[]>([]);
 
-  const showToast = (message: string, type: 'success' | 'error') => {
+  const showToast = (message: string, type: "success" | "error") => {
     const id = Date.now();
     setToasts((prev) => [...prev, { id, message, type }]);
-    
+
     // Auto-eliminar después de 3 segundos
     setTimeout(() => {
       setToasts((prev) => prev.filter((toast) => toast.id !== id));
@@ -30,27 +30,28 @@ export default function DashboardPage() {
 
   const handleToggleLine = async (id: string, checked: boolean) => {
     try {
-      const lineRef = doc(db, 'irrigationLines', id);
+      const lineRef = doc(db, "irrigationLines", id);
       await updateDoc(lineRef, {
         isActive: checked,
       });
-      
+
       // Mostrar notificación de éxito
       showToast(
-        `Línea ${checked ? 'activada' : 'desactivada'} correctamente`,
-        'success'
+        `Línea ${checked ? "activada" : "desactivada"} correctamente`,
+        "success"
       );
     } catch (err) {
-      console.error('Error al actualizar línea de riego:', err);
-      
+      console.error("Error al actualizar línea de riego:", err);
+
       // Mostrar notificación de error
-      const errorMessage = err instanceof Error 
-        ? err.message 
-        : 'Error al actualizar la línea de riego';
-      
+      const errorMessage =
+        err instanceof Error
+          ? err.message
+          : "Error al actualizar la línea de riego";
+
       showToast(
         `Error: ${errorMessage}. Por favor, intenta de nuevo.`,
-        'error'
+        "error"
       );
     }
   };
@@ -61,7 +62,9 @@ export default function DashboardPage() {
       <div className="space-y-6">
         {/* Encabezado */}
         <div className="space-y-2">
-          <h2 className="text-2xl font-bold text-gray-900">Dashboard Principal</h2>
+          <h2 className="text-2xl font-bold text-gray-900">
+            Dashboard Principal
+          </h2>
           <p className="text-gray-600">
             Monitorea y controla tus líneas de riego en tiempo real
           </p>
@@ -70,7 +73,10 @@ export default function DashboardPage() {
         {/* Skeleton de Estadísticas */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
           {[1, 2, 3, 4].map((i) => (
-            <div key={i} className="bg-white p-4 rounded-lg shadow-sm border border-gray-200 animate-pulse">
+            <div
+              key={i}
+              className="bg-white p-4 rounded-lg shadow-sm border border-gray-200 animate-pulse"
+            >
               <div className="h-4 bg-gray-200 rounded w-20 mb-2"></div>
               <div className="h-8 bg-gray-200 rounded w-12"></div>
             </div>
@@ -79,10 +85,15 @@ export default function DashboardPage() {
 
         {/* Skeleton de Líneas de Riego */}
         <div className="space-y-4">
-          <h3 className="text-lg font-semibold text-gray-900">Líneas de Riego</h3>
+          <h3 className="text-lg font-semibold text-gray-900">
+            Líneas de Riego
+          </h3>
           <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
             {[1, 2, 3].map((i) => (
-              <div key={i} className="bg-white p-6 rounded-lg shadow-sm border border-gray-200 animate-pulse">
+              <div
+                key={i}
+                className="bg-white p-6 rounded-lg shadow-sm border border-gray-200 animate-pulse"
+              >
                 <div className="flex justify-between items-start mb-4">
                   <div className="h-6 bg-gray-200 rounded w-32"></div>
                   <div className="h-6 bg-gray-200 rounded-full w-11"></div>
@@ -105,7 +116,9 @@ export default function DashboardPage() {
       <div className="space-y-6">
         {/* Encabezado */}
         <div className="space-y-2">
-          <h2 className="text-2xl font-bold text-gray-900">Dashboard Principal</h2>
+          <h2 className="text-2xl font-bold text-gray-900">
+            Dashboard Principal
+          </h2>
           <p className="text-gray-600">
             Monitorea y controla tus líneas de riego en tiempo real
           </p>
@@ -118,7 +131,9 @@ export default function DashboardPage() {
               <Droplets className="w-8 h-8 text-red-600" />
             </div>
           </div>
-          <h3 className="text-lg font-semibold text-red-900 mb-2">Error al cargar datos</h3>
+          <h3 className="text-lg font-semibold text-red-900 mb-2">
+            Error al cargar datos
+          </h3>
           <p className="text-red-700">{error}</p>
           <p className="text-sm text-red-600 mt-2">
             Por favor, verifica tu conexión e intenta recargar la página.
@@ -136,12 +151,12 @@ export default function DashboardPage() {
           <div
             key={toast.id}
             className={`flex items-center gap-3 px-4 py-3 rounded-lg shadow-lg animate-in slide-in-from-right duration-300 ${
-              toast.type === 'success'
-                ? 'bg-green-500 text-white'
-                : 'bg-red-500 text-white'
+              toast.type === "success"
+                ? "bg-green-500 text-white"
+                : "bg-red-500 text-white"
             }`}
           >
-            {toast.type === 'success' ? (
+            {toast.type === "success" ? (
               <CheckCircle className="w-5 h-5 flex-shrink-0" />
             ) : (
               <XCircle className="w-5 h-5 flex-shrink-0" />
@@ -168,7 +183,9 @@ export default function DashboardPage() {
 
       {/* Encabezado */}
       <div className="space-y-2">
-        <h2 className="text-2xl font-bold text-gray-900">Dashboard Principal</h2>
+        <h2 className="text-2xl font-bold text-gray-900">
+          Dashboard Principal
+        </h2>
         <p className="text-gray-600">
           Monitorea y controla tus líneas de riego en tiempo real
         </p>
@@ -197,7 +214,8 @@ export default function DashboardPage() {
           <p className="text-2xl font-bold text-blue-600">
             {Math.round(
               lines.reduce((acc, l) => acc + l.humidity, 0) / lines.length
-            )}%
+            )}
+            %
           </p>
         </div>
       </div>

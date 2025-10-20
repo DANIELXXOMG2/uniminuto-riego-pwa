@@ -3,6 +3,7 @@
 ## 🔐 Rutas de Autenticación
 
 ### `/login` - Pantalla de Inicio de Sesión
+
 - **Archivo**: `app/(auth)/login/page.tsx`
 - **Descripción**: Formulario de autenticación con email y contraseña
 - **Características**:
@@ -16,6 +17,7 @@
 ## 📊 Rutas del Dashboard
 
 ### `/` - Dashboard Principal
+
 - **Archivo**: `app/(dashboard)/page.tsx`
 - **Layout**: `app/(dashboard)/layout.tsx`
 - **Descripción**: Vista principal del sistema de riego
@@ -33,6 +35,7 @@
 ## 🎨 Componentes UI
 
 ### Navbar (Dashboard Layout)
+
 - Logo de UNIMINUTO Riego
 - Título de la aplicación
 - Icono de notificaciones con indicador
@@ -40,6 +43,7 @@
 - Diseño sticky (permanece visible al hacer scroll)
 
 ### IrrigationLineCard
+
 - **Ubicación**: `components/ui/IrrigationLineCard.tsx`
 - **Props**:
   - `title`: Nombre de la línea de riego
@@ -78,11 +82,13 @@
 ## 🔄 Estados de la Aplicación
 
 ### Online
+
 - Todas las funcionalidades disponibles
 - Sincronización en tiempo real
 - Sin banner de advertencia
 
 ### Offline (Futuro)
+
 - Banner naranja visible
 - Datos en caché disponibles
 - Cambios pendientes de sincronización

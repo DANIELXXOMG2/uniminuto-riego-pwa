@@ -15,7 +15,8 @@ const geistMono = Geist_Mono({
 
 export const metadata: Metadata = {
   title: "Sistema de Riego Inteligente - Uniminuto",
-  description: "Sistema de monitoreo y control de riego inteligente para gestión eficiente del agua",
+  description:
+    "Sistema de monitoreo y control de riego inteligente para gestión eficiente del agua",
   manifest: "/manifest.json",
   appleWebApp: {
     capable: true,
@@ -27,9 +28,7 @@ export const metadata: Metadata = {
       { url: "/icon-192x192.png", sizes: "192x192", type: "image/png" },
       { url: "/icon-512x512.png", sizes: "512x512", type: "image/png" },
     ],
-    apple: [
-      { url: "/icon-192x192.png", sizes: "192x192", type: "image/png" },
-    ],
+    apple: [{ url: "/icon-192x192.png", sizes: "192x192", type: "image/png" }],
   },
 };
 
@@ -55,9 +54,7 @@ export default function RootLayout({
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
-        <AuthProvider>
-          {children}
-        </AuthProvider>
+        <AuthProvider>{children}</AuthProvider>
       </body>
     </html>
   );
