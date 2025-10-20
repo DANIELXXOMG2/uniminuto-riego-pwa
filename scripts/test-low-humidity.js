@@ -6,6 +6,7 @@
  */
 
 const admin = require("firebase-admin");
+const path = require("path");
 
 // Obtener argumentos
 const lineId = process.argv[2] || "test-line-1";
@@ -16,11 +17,16 @@ if (humidity < 0 || humidity > 100) {
   process.exit(1);
 }
 
-// Inicializar Firebase Admin
+// Inicializar Firebase Admin con service account
 try {
-  admin.initializeApp();
+  const serviceAccount = require(path.join(__dirname, "..", "functions", "serviceAccountKey.json"));
+  admin.initializeApp({
+    credential: admin.credential.cert(serviceAccount),
+  });
+  console.log("✅ Autenticado con Firebase Admin SDK");
 } catch (error) {
   console.error("❌ Error al inicializar Firebase:", error.message);
+  console.error("💡 Asegúrate de tener functions/serviceAccountKey.json");
   process.exit(1);
 }
 

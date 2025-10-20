@@ -1,17 +1,23 @@
 #!/usr/bin/env node
 
 /**
- * Script para listar tokens FCM de usuarios
+ * Script para listar todos los tokens FCM de usuarios
  * Uso: node scripts/get-fcm-tokens.js
  */
 
 const admin = require("firebase-admin");
+const path = require("path");
 
-// Inicializar Firebase Admin
+// Inicializar Firebase Admin con service account
 try {
-  admin.initializeApp();
+  const serviceAccount = require(path.join(__dirname, "..", "functions", "serviceAccountKey.json"));
+  admin.initializeApp({
+    credential: admin.credential.cert(serviceAccount),
+  });
+  console.log("✅ Autenticado con Firebase Admin SDK");
 } catch (error) {
   console.error("❌ Error al inicializar Firebase:", error.message);
+  console.error("💡 Asegúrate de tener functions/serviceAccountKey.json");
   process.exit(1);
 }
 
