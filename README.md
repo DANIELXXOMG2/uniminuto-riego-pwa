@@ -17,13 +17,14 @@ PWA Offline-First para la supervisión y control de un sistema de riego intelige
 
 ## 🛠️ Stack Tecnológico
 
-| Componente                  | Tecnología                               | Propósito                                                                     |
-| --------------------------- | ---------------------------------------- | ----------------------------------------------------------------------------- |
-| **Aplicación Web (PWA)**    | [Next.js](https://nextjs.org/) (React)   | Frontend, capacidades PWA y lógica de negocio.                                |
-| **Backend & Base de Datos** | [Firebase](https://firebase.google.com/) | Firestore para datos, Authentication para usuarios y FCM para notificaciones. |
-| **Componentes UI**          | [shadcn/ui](https://ui.shadcn.com/)      | Creación de un sistema de diseño robusto y accesible.                         |
-| **Dispositivo IoT**         | [Arduino](https://www.arduino.cc/)       | Control de sensores y actuadores en campo.                                    |
-| **Despliegue**              | [Vercel](https://vercel.com/)            | Hosting y despliegue continuo de la PWA.                                      |
+| Componente | Tecnología | Propósito |
+| :--- | :--- | :--- |
+| **Aplicación Web (PWA)** | [Next.js](https://nextjs.org/) (React) | Frontend, Backend integrado y capacidades de PWA. |
+| **Base de Datos** | [Firebase Firestore](https://firebase.google.com/products/firestore) | Base de datos NoSQL para almacenamiento centralizado. |
+| **Base de Datos Local** | [IndexedDB](https://developer.mozilla.org/es/docs/Web/API/IndexedDB_API) | Almacenamiento de datos en el navegador para uso offline. |
+| **Autenticación** | [Firebase Authentication](https://firebase.google.com/products/auth) | Gestión de usuarios y seguridad. |
+| **Dispositivo IoT** | [Arduino](https://www.arduino.cc/) | Control de sensores y actuadores en el campo. |
+| **Despliegue** | [Vercel](https://vercel.com/) | Hosting y despliegue continuo de la aplicación web. |
 
 ---
 
