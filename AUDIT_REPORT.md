@@ -1,4 +1,5 @@
 # 🔒 INFORME DE AUDITORÍA DE SEGURIDAD Y REPOSITORIO
+
 **Sistema de Riego Inteligente - Uniminuto**
 
 **Fecha:** 19 de Octubre, 2025  
@@ -12,6 +13,7 @@
 ### ✅ Estado General: **SEGURO CON MEJORAS RECOMENDADAS**
 
 **Hallazgos Principales:**
+
 - ✅ **Sin credenciales expuestas** en el historial de Git
 - ⚠️ **2 commits** contienen referencias a API keys (pero en contexto seguro)
 - ⚠️ **4 archivos** deben ser eliminados del repositorio
@@ -24,14 +26,14 @@
 
 ### Tamaño y Estructura
 
-| Métrica | Valor | Estado |
-|---------|-------|--------|
-| **Tamaño total de .git** | 2.1 MB | 🟢 Excelente |
-| **Tamaño de clonación** | ~383 KB (comprimido) | 🟢 Muy ligero |
-| **Archivos trackeados** | 75 archivos | 🟢 Óptimo |
-| **Total de commits** | 29 commits | 🟢 Normal |
-| **Branches activos** | 11 branches | 🟡 Considerar limpieza |
-| **Contribuidores** | 4 personas | 🟢 Normal |
+| Métrica                  | Valor                | Estado                 |
+| ------------------------ | -------------------- | ---------------------- |
+| **Tamaño total de .git** | 2.1 MB               | 🟢 Excelente           |
+| **Tamaño de clonación**  | ~383 KB (comprimido) | 🟢 Muy ligero          |
+| **Archivos trackeados**  | 75 archivos          | 🟢 Óptimo              |
+| **Total de commits**     | 29 commits           | 🟢 Normal              |
+| **Branches activos**     | 11 branches          | 🟡 Considerar limpieza |
+| **Contribuidores**       | 4 personas           | 🟢 Normal              |
 
 ### Comparación de Tamaños
 
@@ -55,6 +57,7 @@
 ### 1. ✅ ARCHIVOS SENSIBLES (Sin Problemas Críticos)
 
 #### En el Historial de Git
+
 ```
 🔍 Archivos .env: NINGUNO ✅
 🔍 Service Account Keys: NINGUNO ✅
@@ -62,6 +65,7 @@
 ```
 
 #### Commits con Referencias a API Keys
+
 ```
 ⚠️  2 commits encontrados:
    - 396d153 (2025-10-19) feat(sprint-4): add husky...
@@ -82,11 +86,12 @@
 
 ```
 ❌ apps/web/bun.lock      (212 KB)
-❌ bun.lock               (131 KB) 
+❌ bun.lock               (131 KB)
 ❌ functions/package-lock.json (342 KB)
 ```
 
 **Razón para eliminar:**
+
 - Ocupan **~685 KB** en el repositorio
 - Causan conflictos de merge
 - `bun.lock` en la raíz es suficiente
@@ -101,6 +106,7 @@
 ```
 
 **Razón para eliminar:**
+
 - Ya migraste a `eslint.config.mjs` (ESLint 9)
 - Puede causar conflictos de configuración
 - Está duplicado e inactivo
@@ -111,11 +117,11 @@
 
 **Top 4 archivos más grandes:**
 
-| Tamaño | Archivo | Estado |
-|--------|---------|--------|
-| 342 KB | functions/package-lock.json | ❌ ELIMINAR |
-| 213 KB | apps/web/bun.lock | ❌ ELIMINAR |
-| 132 KB | bun.lock (histórico) | ⚠️ En historial |
+| Tamaño | Archivo                       | Estado          |
+| ------ | ----------------------------- | --------------- |
+| 342 KB | functions/package-lock.json   | ❌ ELIMINAR     |
+| 213 KB | apps/web/bun.lock             | ❌ ELIMINAR     |
+| 132 KB | bun.lock (histórico)          | ⚠️ En historial |
 | 124 KB | apps/web/bun.lock (histórico) | ⚠️ En historial |
 
 **Total espacio recuperable:** ~810 KB
@@ -125,6 +131,7 @@
 ### 4. 🔐 SEGURIDAD DEL CÓDIGO
 
 #### Strings Sensibles en Código
+
 ```
 ✅ No se encontraron API keys hardcodeadas
 ✅ No se encontraron tokens hardcodeados
@@ -132,6 +139,7 @@
 ```
 
 #### Configuración de Seguridad
+
 ```
 ✅ Variables de entorno en .env (no trackeado)
 ✅ .env.example proporcionado (trackeado)
@@ -144,6 +152,7 @@
 ### 5. 🗑️ ARCHIVOS RESIDUALES
 
 #### Estado Actual
+
 ```
 ✅ Sin archivos de build trackeados (.next/, dist/, out/)
 ✅ Sin node_modules/ trackeado
@@ -164,6 +173,7 @@
 **Razón:** Liberan ~685 KB y previenen conflictos
 
 **Comandos:**
+
 ```bash
 # 1. Hacer backup
 git branch backup-antes-limpieza
@@ -293,11 +303,11 @@ git commit -m "chore: configure Git LFS"
 
 ### Antes vs Después de Limpieza
 
-| Métrica | Actual | Después de Limpieza | Mejora |
-|---------|--------|---------------------|--------|
-| **Tamaño .git** | 2.1 MB | ~1.6 MB | ✅ -24% |
-| **Clonación** | 383 KB | ~290 KB | ✅ -24% |
-| **Archivos tracked** | 75 | 72 | ✅ -4% |
+| Métrica              | Actual | Después de Limpieza | Mejora  |
+| -------------------- | ------ | ------------------- | ------- |
+| **Tamaño .git**      | 2.1 MB | ~1.6 MB             | ✅ -24% |
+| **Clonación**        | 383 KB | ~290 KB             | ✅ -24% |
+| **Archivos tracked** | 75     | 72                  | ✅ -4%  |
 
 ---
 
@@ -305,24 +315,24 @@ git commit -m "chore: configure Git LFS"
 
 ### ¿Es tu repo grande o pequeño?
 
-| Tipo de Repo | Tamaño Típico | Tu Repo |
-|--------------|---------------|---------|
-| **Micro** | < 1 MB | ✅ Estás aquí (2.1 MB) |
-| **Pequeño** | 1-10 MB | |
-| **Mediano** | 10-100 MB | |
-| **Grande** | 100-500 MB | |
-| **Muy Grande** | > 500 MB | |
+| Tipo de Repo   | Tamaño Típico | Tu Repo                |
+| -------------- | ------------- | ---------------------- |
+| **Micro**      | < 1 MB        | ✅ Estás aquí (2.1 MB) |
+| **Pequeño**    | 1-10 MB       |                        |
+| **Mediano**    | 10-100 MB     |                        |
+| **Grande**     | 100-500 MB    |                        |
+| **Muy Grande** | > 500 MB      |                        |
 
 **Conclusión:** Tu repositorio es **MICRO** y muy eficiente. ✅
 
 ### Comparación con Repos Similares
 
-| Proyecto | Tamaño | Comparación |
-|----------|--------|-------------|
-| **Next.js Starter** | ~5 MB | Tu repo: 2.1 MB ✅ |
-| **Create React App** | ~8 MB | Tu repo: 2.1 MB ✅ |
-| **Firebase Functions** | ~3 MB | Tu repo: 2.1 MB ✅ |
-| **Tu Proyecto** | **2.1 MB** | 🏆 **Óptimo** |
+| Proyecto               | Tamaño     | Comparación        |
+| ---------------------- | ---------- | ------------------ |
+| **Next.js Starter**    | ~5 MB      | Tu repo: 2.1 MB ✅ |
+| **Create React App**   | ~8 MB      | Tu repo: 2.1 MB ✅ |
+| **Firebase Functions** | ~3 MB      | Tu repo: 2.1 MB ✅ |
+| **Tu Proyecto**        | **2.1 MB** | 🏆 **Óptimo**      |
 
 ---
 
@@ -331,6 +341,7 @@ git commit -m "chore: configure Git LFS"
 ### Antes de Implementar el Plan
 
 - [ ] Hacer backup del repositorio
+
   ```bash
   git clone --mirror . ../backup-uniminuto-riego-pwa
   ```
@@ -353,12 +364,14 @@ git commit -m "chore: configure Git LFS"
 ### Después de la Implementación
 
 - [ ] Verificar build local
+
   ```bash
   cd functions && bun install && bun run build
   cd ../apps/web && bun install && bun run build
   ```
 
 - [ ] Verificar tamaño del repo
+
   ```bash
   du -sh .git
   git count-objects -vH
@@ -372,6 +385,7 @@ git commit -m "chore: configure Git LFS"
 ## 🚀 BENEFICIOS ESPERADOS
 
 ### Técnicos
+
 - ✅ Repo 24% más ligero (~500 KB menos)
 - ✅ Clonaciones más rápidas
 - ✅ Menos conflictos de merge en lockfiles
@@ -379,6 +393,7 @@ git commit -m "chore: configure Git LFS"
 - ✅ Menos confusión con múltiples lockfiles
 
 ### Organizacionales
+
 - ✅ Mejor experiencia para nuevos desarrolladores
 - ✅ Menos tiempo esperando clonaciones
 - ✅ Menos problemas de sincronización
@@ -424,11 +439,12 @@ Tu repositorio está en **excelente estado** de seguridad y optimización:
 ✅ **Tamaño:** Muy ligero (2.1 MB)  
 ✅ **Organización:** Bien estructurado  
 ✅ **Limpieza:** Sin archivos basura  
-✅ **.gitignore:** Correctamente configurado  
+✅ **.gitignore:** Correctamente configurado
 
 ### Recomendación Final
 
 **Implementa el Plan de Alta Prioridad** para:
+
 - Eliminar 3 lockfiles innecesarios
 - Remover 1 archivo de configuración antiguo
 - Ahorrar ~685 KB
@@ -436,7 +452,7 @@ Tu repositorio está en **excelente estado** de seguridad y optimización:
 
 **Tiempo estimado:** 15 minutos  
 **Riesgo:** Muy bajo  
-**Beneficio:** Alto  
+**Beneficio:** Alto
 
 ---
 
@@ -466,6 +482,7 @@ Tu repositorio está en **excelente estado** de seguridad y optimización:
 ## 💬 ¿Preguntas?
 
 Si tienes dudas sobre alguna recomendación:
+
 1. Revisa la sección de "Recursos y Documentación"
 2. Consulta el archivo `SECURITY.md` del proyecto
 3. Pregunta al equipo antes de hacer cambios mayores

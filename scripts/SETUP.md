@@ -21,12 +21,14 @@ node test-low-humidity.js test-line-2 25
 ```
 
 **Qué hace:**
+
 1. Establece humedad alta (30%)
 2. Espera 2 segundos
 3. Baja la humedad al valor especificado
 4. ⚡ Dispara `onLowHumidityAlert` si < 35%
 
 **Output esperado:**
+
 ```
 ✅ Autenticado con Firebase Admin SDK
 
@@ -58,12 +60,14 @@ node test-status-change.js line-2 true
 ```
 
 **Qué hace:**
+
 1. Verifica si existe el documento
 2. Lo crea si no existe
 3. Cambia el estado (isActive)
 4. ⚡ Dispara `onIrrigationStatusChange`
 
 **Output esperado:**
+
 ```
 ✅ Autenticado con Firebase Admin SDK
 
@@ -87,11 +91,13 @@ node get-fcm-tokens.js
 ```
 
 **Qué hace:**
+
 1. Lee la colección `users`
 2. Extrae los FCM tokens
 3. Muestra resumen por rol (admin/user)
 
 **Output esperado:**
+
 ```
 ✅ Autenticado con Firebase Admin SDK
 
@@ -204,6 +210,7 @@ npm install firebase-admin
 ### Las notificaciones no llegan
 
 1. **Verificar tokens FCM:**
+
    ```bash
    node get-fcm-tokens.js
    ```

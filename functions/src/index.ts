@@ -10,6 +10,7 @@
 import { setGlobalOptions } from "firebase-functions/v2/options";
 import { onDocumentUpdated } from "firebase-functions/v2/firestore";
 import { onSchedule } from "firebase-functions/v2/scheduler";
+import { onCall, HttpsError } from "firebase-functions/v2/https";
 import * as admin from "firebase-admin";
 import * as logger from "firebase-functions/logger";
 
@@ -433,6 +434,206 @@ export const sendTestNotification = onSchedule(
       );
     } catch (error) {
       logger.error("Error sending test notification:", error);
+    }
+  }
+);
+
+/**
+ * 5. FUNCIÓN CALLABLE: Actualizar Rol de Usuario
+ *
+ * Permite a los administradores cambiar el rol de un usuario
+ * Solo accesible por usuarios con rol 'admin'
+ */
+export const updateUserRole = onCall(
+  {
+    region: "us-central1",
+  },
+  async (request) => {
+    try {
+      // Verificar autenticación
+      if (!request.auth) {
+        throw new HttpsError(
+          "unauthenticated",
+          "Debes estar autenticado para realizar esta operación"
+        );
+      }
+
+      const callerUid = request.auth.uid;
+
+      // Verificar que el caller es admin
+      const callerDoc = await admin
+        .firestore()
+        .collection("users")
+        .doc(callerUid)
+        .get();
+
+      const callerData = callerDoc.data();
+      if (!callerData || callerData.role !== "admin") {
+        throw new HttpsError(
+          "permission-denied",
+          "Solo los administradores pueden cambiar roles de usuario"
+        );
+      }
+
+      // Obtener datos de la petición
+      const { userId, newRole } = request.data as {
+        userId: string;
+        newRole: string;
+      };
+
+      // Validar datos
+      if (!userId || typeof userId !== "string") {
+        throw new HttpsError("invalid-argument", "userId es requerido");
+      }
+
+      if (
+        !newRole ||
+        typeof newRole !== "string" ||
+        !["admin", "supervisor"].includes(newRole)
+      ) {
+        throw new HttpsError(
+          "invalid-argument",
+          "newRole debe ser 'admin' o 'supervisor'"
+        );
+      }
+
+      // No permitir que un admin se quite sus propios privilegios
+      if (userId === callerUid) {
+        throw new HttpsError(
+          "permission-denied",
+          "No puedes cambiar tu propio rol"
+        );
+      }
+
+      logger.info(
+        `Admin ${callerUid} updating role for user ${userId} to ${newRole}`
+      );
+
+      // Actualizar custom claims
+      await admin.auth().setCustomUserClaims(userId, { role: newRole });
+
+      // Actualizar documento en Firestore
+      await admin.firestore().collection("users").doc(userId).update({
+        role: newRole,
+        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+        updatedBy: callerUid,
+      });
+
+      logger.info(`✅ Role updated successfully for user ${userId}`);
+
+      return {
+        success: true,
+        message: "Rol actualizado exitosamente",
+        userId,
+        newRole,
+      };
+    } catch (error) {
+      logger.error("Error updating user role:", error);
+
+      if (error instanceof HttpsError) {
+        throw error;
+      }
+
+      throw new HttpsError(
+        "internal",
+        "Error al actualizar el rol del usuario"
+      );
+    }
+  }
+);
+
+/**
+ * 6. FUNCIÓN CALLABLE: Eliminar Usuario
+ *
+ * Permite a los administradores eliminar un usuario del sistema
+ * Solo accesible por usuarios con rol 'admin'
+ */
+export const deleteUser = onCall(
+  {
+    region: "us-central1",
+  },
+  async (request) => {
+    try {
+      // Verificar autenticación
+      if (!request.auth) {
+        throw new HttpsError(
+          "unauthenticated",
+          "Debes estar autenticado para realizar esta operación"
+        );
+      }
+
+      const callerUid = request.auth.uid;
+
+      // Verificar que el caller es admin
+      const callerDoc = await admin
+        .firestore()
+        .collection("users")
+        .doc(callerUid)
+        .get();
+
+      const callerData = callerDoc.data();
+      if (!callerData || callerData.role !== "admin") {
+        throw new HttpsError(
+          "permission-denied",
+          "Solo los administradores pueden eliminar usuarios"
+        );
+      }
+
+      // Obtener datos de la petición
+      const { userId } = request.data as { userId: string };
+
+      // Validar datos
+      if (!userId || typeof userId !== "string") {
+        throw new HttpsError("invalid-argument", "userId es requerido");
+      }
+
+      // No permitir que un admin se elimine a sí mismo
+      if (userId === callerUid) {
+        throw new HttpsError(
+          "permission-denied",
+          "No puedes eliminarte a ti mismo"
+        );
+      }
+
+      logger.info(`Admin ${callerUid} deleting user ${userId}`);
+
+      // Eliminar documento de Firestore
+      await admin.firestore().collection("users").doc(userId).delete();
+
+      // Eliminar usuario de Authentication
+      await admin.auth().deleteUser(userId);
+
+      logger.info(`✅ User ${userId} deleted successfully`);
+
+      return {
+        success: true,
+        message: "Usuario eliminado exitosamente",
+        userId,
+      };
+    } catch (error) {
+      logger.error("Error deleting user:", error);
+
+      if (error instanceof HttpsError) {
+        throw error;
+      }
+
+      // Manejar casos específicos
+      if (
+        error instanceof Error &&
+        error.message.includes("auth/user-not-found")
+      ) {
+        // Si el usuario ya no existe en Auth, solo eliminamos de Firestore
+        const { userId } = request.data as { userId: string };
+        await admin.firestore().collection("users").doc(userId).delete();
+
+        return {
+          success: true,
+          message: "Usuario eliminado exitosamente",
+          userId,
+        };
+      }
+
+      throw new HttpsError("internal", "Error al eliminar el usuario");
     }
   }
 );

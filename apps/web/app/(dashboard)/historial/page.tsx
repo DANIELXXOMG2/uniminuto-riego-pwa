@@ -1,10 +1,18 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { ArrowLeft } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { useReadings } from "@/lib/useReadings";
+import { useSensors } from "@/lib/useSensors";
 import {
   LineChart,
   Line,
@@ -20,13 +28,27 @@ type DateRange = "24h" | "7d" | "30d";
 export default function HistorialPage() {
   const router = useRouter();
   const [selectedRange, setSelectedRange] = useState<DateRange>("7d");
+  const [selectedSensorId, setSelectedSensorId] = useState<string | null>(null);
 
-  // TODO: Reemplazar con el sensorId real de tu sistema
-  // Puedes obtenerlo desde el contexto o props cuando integres con el dashboard
-  const SENSOR_ID = "sensor-001"; // Hardcoded por ahora
+  // Obtener lista de sensores disponibles
+  const {
+    sensors,
+    loading: sensorsLoading,
+    error: sensorsError,
+  } = useSensors();
 
-  // Obtener lecturas del sensor
-  const { readings, loading, error } = useReadings(SENSOR_ID, selectedRange);
+  // Seleccionar automáticamente el primer sensor cuando se carguen
+  useEffect(() => {
+    if (sensors.length > 0 && !selectedSensorId) {
+      setSelectedSensorId(sensors[0].id);
+    }
+  }, [sensors, selectedSensorId]);
+
+  // Obtener lecturas del sensor seleccionado
+  const { readings, loading, error } = useReadings(
+    selectedSensorId,
+    selectedRange
+  );
 
   // Calcular métricas de resumen
   const metrics = useMemo(() => {
@@ -92,6 +114,54 @@ export default function HistorialPage() {
       </header>
 
       <div className="px-4 pb-6 space-y-6">
+        {/* Sensor Selection */}
+        {sensorsLoading ? (
+          <div className="bg-emerald-900/50 rounded-lg p-4">
+            <div className="h-10 bg-emerald-800/30 animate-pulse rounded" />
+          </div>
+        ) : sensorsError ? (
+          <div className="bg-red-900/30 border border-red-700 rounded-lg p-4 text-red-200">
+            <p className="font-semibold">Error al cargar sensores</p>
+            <p className="text-sm">{sensorsError}</p>
+          </div>
+        ) : sensors.length === 0 ? (
+          <div className="bg-yellow-900/30 border border-yellow-700 rounded-lg p-4 text-yellow-200">
+            <p className="font-semibold">No hay sensores disponibles</p>
+            <p className="text-sm">No se encontraron sensores en el sistema</p>
+          </div>
+        ) : (
+          <div className="space-y-2">
+            <label
+              htmlFor="sensor-select"
+              className="text-sm font-medium text-emerald-200"
+            >
+              Seleccionar Sensor
+            </label>
+            <Select
+              value={selectedSensorId || undefined}
+              onValueChange={setSelectedSensorId}
+            >
+              <SelectTrigger
+                id="sensor-select"
+                className="bg-emerald-900/50 border-emerald-700 text-white hover:bg-emerald-800/50"
+              >
+                <SelectValue placeholder="Selecciona un sensor" />
+              </SelectTrigger>
+              <SelectContent className="bg-emerald-900 border-emerald-700 text-white">
+                {sensors.map((sensor) => (
+                  <SelectItem
+                    key={sensor.id}
+                    value={sensor.id}
+                    className="focus:bg-emerald-800 focus:text-white"
+                  >
+                    {sensor.title}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        )}
+
         {/* Date Range Filters */}
         <div className="flex gap-2 bg-emerald-900/50 rounded-lg p-1">
           <Button
@@ -138,117 +208,133 @@ export default function HistorialPage() {
         )}
 
         {/* Humidity Section */}
-        <div className="space-y-4">
-          <div>
-            <h2 className="text-xl font-semibold mb-1">Humedad</h2>
-            <div className="flex items-baseline gap-2">
+        {selectedSensorId ? (
+          <div className="space-y-4">
+            <div>
+              <h2 className="text-xl font-semibold mb-1">Humedad</h2>
+              <div className="flex items-baseline gap-2">
+                {loading ? (
+                  <div className="h-14 w-32 bg-emerald-800/30 animate-pulse rounded" />
+                ) : (
+                  <>
+                    <span className="text-5xl font-bold">
+                      {metrics.average}%
+                    </span>
+                    <span className="text-emerald-400 text-sm">
+                      Últimos {rangeLabel[selectedRange]}
+                    </span>
+                  </>
+                )}
+              </div>
+            </div>
+
+            {/* Chart */}
+            <div className="bg-emerald-900/30 rounded-lg border-2 border-emerald-700/50 p-4">
               {loading ? (
-                <div className="h-14 w-32 bg-emerald-800/30 animate-pulse rounded" />
+                <div className="h-64 flex items-center justify-center">
+                  <div className="text-center space-y-2">
+                    <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-emerald-400 mx-auto" />
+                    <p className="text-emerald-300/70">Cargando datos...</p>
+                  </div>
+                </div>
+              ) : chartData.length === 0 ? (
+                <div className="h-64 flex items-center justify-center">
+                  <div className="text-center space-y-2">
+                    <p className="text-emerald-300/70 text-lg">
+                      No hay datos disponibles
+                    </p>
+                    <p className="text-emerald-400/50 text-sm">
+                      No se encontraron lecturas para el rango seleccionado
+                    </p>
+                  </div>
+                </div>
               ) : (
-                <>
-                  <span className="text-5xl font-bold">{metrics.average}%</span>
-                  <span className="text-emerald-400 text-sm">
-                    Últimos {rangeLabel[selectedRange]}
-                  </span>
-                </>
+                <ResponsiveContainer width="100%" height={250}>
+                  <LineChart data={chartData}>
+                    <CartesianGrid
+                      strokeDasharray="3 3"
+                      stroke="rgba(16, 185, 129, 0.1)"
+                    />
+                    <XAxis
+                      dataKey="time"
+                      stroke="#6ee7b7"
+                      style={{ fontSize: "12px" }}
+                      tick={{ fill: "#6ee7b7" }}
+                    />
+                    <YAxis
+                      stroke="#6ee7b7"
+                      style={{ fontSize: "12px" }}
+                      tick={{ fill: "#6ee7b7" }}
+                      domain={[0, 100]}
+                      label={{
+                        value: "%",
+                        position: "insideTopLeft",
+                        fill: "#6ee7b7",
+                      }}
+                    />
+                    <Tooltip
+                      contentStyle={{
+                        backgroundColor: "#064e3b",
+                        border: "1px solid #10b981",
+                        borderRadius: "8px",
+                        color: "#fff",
+                      }}
+                      labelStyle={{ color: "#6ee7b7" }}
+                    />
+                    <Line
+                      type="monotone"
+                      dataKey="humidity"
+                      stroke="#10b981"
+                      strokeWidth={3}
+                      dot={{ fill: "#10b981", r: 4 }}
+                      activeDot={{ r: 6 }}
+                    />
+                  </LineChart>
+                </ResponsiveContainer>
               )}
             </div>
-          </div>
 
-          {/* Chart */}
-          <div className="bg-emerald-900/30 rounded-lg border-2 border-emerald-700/50 p-4">
-            {loading ? (
-              <div className="h-64 flex items-center justify-center">
-                <div className="text-center space-y-2">
-                  <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-emerald-400 mx-auto" />
-                  <p className="text-emerald-300/70">Cargando datos...</p>
-                </div>
+            {/* Summary Metrics */}
+            <div className="space-y-3 pt-4">
+              <div className="flex justify-between items-center py-3 border-b border-emerald-700/30">
+                <span className="text-emerald-200">Humedad Promedio</span>
+                {loading ? (
+                  <div className="h-7 w-16 bg-emerald-800/30 animate-pulse rounded" />
+                ) : (
+                  <span className="text-xl font-semibold">
+                    {metrics.average}%
+                  </span>
+                )}
               </div>
-            ) : chartData.length === 0 ? (
-              <div className="h-64 flex items-center justify-center">
-                <div className="text-center space-y-2">
-                  <p className="text-emerald-300/70 text-lg">
-                    No hay datos disponibles
-                  </p>
-                  <p className="text-emerald-400/50 text-sm">
-                    No se encontraron lecturas para el rango seleccionado
-                  </p>
-                </div>
+              <div className="flex justify-between items-center py-3 border-b border-emerald-700/30">
+                <span className="text-emerald-200">Humedad Más Baja</span>
+                {loading ? (
+                  <div className="h-7 w-16 bg-emerald-800/30 animate-pulse rounded" />
+                ) : (
+                  <span className="text-xl font-semibold">
+                    {metrics.lowest}%
+                  </span>
+                )}
               </div>
-            ) : (
-              <ResponsiveContainer width="100%" height={250}>
-                <LineChart data={chartData}>
-                  <CartesianGrid
-                    strokeDasharray="3 3"
-                    stroke="rgba(16, 185, 129, 0.1)"
-                  />
-                  <XAxis
-                    dataKey="time"
-                    stroke="#6ee7b7"
-                    style={{ fontSize: "12px" }}
-                    tick={{ fill: "#6ee7b7" }}
-                  />
-                  <YAxis
-                    stroke="#6ee7b7"
-                    style={{ fontSize: "12px" }}
-                    tick={{ fill: "#6ee7b7" }}
-                    domain={[0, 100]}
-                    label={{
-                      value: "%",
-                      position: "insideTopLeft",
-                      fill: "#6ee7b7",
-                    }}
-                  />
-                  <Tooltip
-                    contentStyle={{
-                      backgroundColor: "#064e3b",
-                      border: "1px solid #10b981",
-                      borderRadius: "8px",
-                      color: "#fff",
-                    }}
-                    labelStyle={{ color: "#6ee7b7" }}
-                  />
-                  <Line
-                    type="monotone"
-                    dataKey="humidity"
-                    stroke="#10b981"
-                    strokeWidth={3}
-                    dot={{ fill: "#10b981", r: 4 }}
-                    activeDot={{ r: 6 }}
-                  />
-                </LineChart>
-              </ResponsiveContainer>
-            )}
+              <div className="flex justify-between items-center py-3">
+                <span className="text-emerald-200">Humedad Más Alta</span>
+                {loading ? (
+                  <div className="h-7 w-16 bg-emerald-800/30 animate-pulse rounded" />
+                ) : (
+                  <span className="text-xl font-semibold">
+                    {metrics.highest}%
+                  </span>
+                )}
+              </div>
+            </div>
           </div>
-        </div>
-
-        {/* Summary Metrics */}
-        <div className="space-y-3 pt-4">
-          <div className="flex justify-between items-center py-3 border-b border-emerald-700/30">
-            <span className="text-emerald-200">Humedad Promedio</span>
-            {loading ? (
-              <div className="h-7 w-16 bg-emerald-800/30 animate-pulse rounded" />
-            ) : (
-              <span className="text-xl font-semibold">{metrics.average}%</span>
-            )}
+        ) : (
+          <div className="bg-blue-900/30 border border-blue-700 rounded-lg p-6 text-center">
+            <p className="text-blue-200 text-lg">
+              Por favor, selecciona un sensor para ver su historial
+            </p>
           </div>
-          <div className="flex justify-between items-center py-3 border-b border-emerald-700/30">
-            <span className="text-emerald-200">Humedad Más Baja</span>
-            {loading ? (
-              <div className="h-7 w-16 bg-emerald-800/30 animate-pulse rounded" />
-            ) : (
-              <span className="text-xl font-semibold">{metrics.lowest}%</span>
-            )}
-          </div>
-          <div className="flex justify-between items-center py-3">
-            <span className="text-emerald-200">Humedad Más Alta</span>
-            {loading ? (
-              <div className="h-7 w-16 bg-emerald-800/30 animate-pulse rounded" />
-            ) : (
-              <span className="text-xl font-semibold">{metrics.highest}%</span>
-            )}
-          </div>
-        </div>
+        )}
       </div>
     </div>
   );

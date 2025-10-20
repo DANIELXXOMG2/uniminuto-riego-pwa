@@ -1,4 +1,5 @@
 # 🔥 Firebase Cloud Functions - FAQ Completo
+
 **Sistema de Riego Inteligente - Uniminuto**
 
 ---
@@ -7,12 +8,12 @@
 
 ### ✅ Funciones Desplegadas
 
-| Función | Activador | Solicitudes (24h) | Estado | Descripción |
-|---------|-----------|-------------------|--------|-------------|
-| **onLowHumidityAlert** | `document.updated` | 0 | ✅ Activa | Envía notificación cuando humedad < 35% |
-| **onIrrigationStatusChange** | `document.updated` | 0 | ✅ Activa | Notifica cambios de estado del riego |
-| **onSensorFailureCheck** | `every 1 hours` | 2 | ✅ Activa | Revisa sensores inactivos (cada hora) |
-| **sendTestNotification** | `every 24 hours` | 0 | ✅ Activa | Función de prueba (cada 24h) |
+| Función                      | Activador          | Solicitudes (24h) | Estado    | Descripción                             |
+| ---------------------------- | ------------------ | ----------------- | --------- | --------------------------------------- |
+| **onLowHumidityAlert**       | `document.updated` | 0                 | ✅ Activa | Envía notificación cuando humedad < 35% |
+| **onIrrigationStatusChange** | `document.updated` | 0                 | ✅ Activa | Notifica cambios de estado del riego    |
+| **onSensorFailureCheck**     | `every 1 hours`    | 2                 | ✅ Activa | Revisa sensores inactivos (cada hora)   |
+| **sendTestNotification**     | `every 24 hours`   | 0                 | ✅ Activa | Función de prueba (cada 24h)            |
 
 ---
 
@@ -21,12 +22,14 @@
 ### ✅ SÍ, Es Totalmente Correcto
 
 **Por qué las funciones muestran "0 solicitudes":**
+
 - Son funciones **nuevas** (acabas de desplegarlas)
 - Las Firestore triggers solo se ejecutan cuando hay **cambios en la base de datos**
 - `onSensorFailureCheck` ya tiene 2 ejecuciones (cada hora)
 - Esto es **normal y esperado** ✅
 
 **Cuando verás solicitudes:**
+
 1. `onLowHumidityAlert`: Cuando el Arduino envíe datos con humedad < 35%
 2. `onIrrigationStatusChange`: Cuando cambies el estado del riego (ON/OFF) desde la app
 3. `onSensorFailureCheck`: Ya está ejecutándose automáticamente cada hora
@@ -39,21 +42,25 @@
 ### Explicación de los Tipos de Trigger
 
 #### A. Firestore Triggers (Largos)
+
 ```
 google.cloud.firestore.document.v1.updated
 ```
 
 **Desglose:**
+
 - `google.cloud.firestore` → Es un trigger de Firestore
 - `document.v1` → Versión 1 del API de documentos
 - `updated` → Se ejecuta cuando un documento se ACTUALIZA
 
 **Por qué es largo:**
+
 - Es el nombre técnico completo del **evento de Google Cloud**
 - Firestore emite eventos con este formato estándar
 - Firebase lo traduce internamente
 
 **En tu código:**
+
 ```typescript
 // Tu código:
 export const onLowHumidityAlert = onDocumentUpdated(
@@ -67,16 +74,19 @@ export const onLowHumidityAlert = onDocumentUpdated(
 ```
 
 #### B. Scheduled Triggers (Cortos)
+
 ```
 scheduled
 ```
 
 **Desglose:**
+
 - `scheduled` → Función programada con Cloud Scheduler
 - Se ejecuta en intervalos de tiempo
 - No depende de eventos externos
 
 **En tu código:**
+
 ```typescript
 // Tu código:
 export const onSensorFailureCheck = onSchedule(
@@ -144,11 +154,13 @@ graph LR
    - Actualiza los triggers si cambiaron
 
 **¿Se implementan solas?**
+
 - ❌ NO se actualizan automáticamente sin deploy
 - ✅ Pero el deploy es muy rápido (~2 minutos)
 - ✅ Firebase maneja la transición sin downtime
 
 **Si cambias un trigger:**
+
 - Firebase detecta el cambio automáticamente
 - Si es **incompatible** (HTTPS → Firestore), tienes que eliminar primero
 - Si es **compatible** (cambiar schedule), se actualiza solo
@@ -194,6 +206,7 @@ graph LR
 ### Conexión Firebase ↔ Vercel
 
 **NO hay conexión directa entre Firebase Functions y Vercel:**
+
 - Son **independientes**
 - Ambos leen/escriben a **Firestore** (base de datos compartida)
 - La conexión es a través de **Firestore como intermediario**
@@ -218,7 +231,7 @@ onLowHumidityAlert(event) {
   if (humidity < 35) {
     // Consulta usuarios
     const users = await getUsers();
-    
+
     // Envía notificación FCM
     await messaging.send({
       token: user.fcmToken,
@@ -263,11 +276,13 @@ FIREBASE_PROJECT_ID=uniminuto-riego-pwa
 ```
 
 **Firebase las obtiene automáticamente:**
+
 - `process.env.GCLOUD_PROJECT` → Nombre del proyecto
 - Firebase Admin SDK se autentica automáticamente
 - No necesitas credenciales manuales en producción ✅
 
 **Para desarrollo local:**
+
 ```bash
 # 1. Copia el service account key
 firebase init functions
@@ -282,12 +297,12 @@ firebase emulators:start --only functions,firestore
 
 ### Plan Blaze - Free Tier
 
-| Recurso | Free Tier | Tu Uso Estimado | Costo |
-|---------|-----------|-----------------|-------|
-| **Invocaciones** | 2M/mes | ~500/mes | $0 |
-| **GB-segundos** | 400K/mes | ~1K/mes | $0 |
-| **CPU-segundos** | 200K/mes | ~500/mes | $0 |
-| **Salida de red** | 5 GB/mes | ~10 MB/mes | $0 |
+| Recurso           | Free Tier | Tu Uso Estimado | Costo |
+| ----------------- | --------- | --------------- | ----- |
+| **Invocaciones**  | 2M/mes    | ~500/mes        | $0    |
+| **GB-segundos**   | 400K/mes  | ~1K/mes         | $0    |
+| **CPU-segundos**  | 200K/mes  | ~500/mes        | $0    |
+| **Salida de red** | 5 GB/mes  | ~10 MB/mes      | $0    |
 
 **Cálculo detallado:**
 
@@ -312,6 +327,7 @@ COSTO TOTAL ESTIMADO: $0.00 ✅
 ```
 
 **Límites de alerta:**
+
 - Firebase te avisa si llegas al 80% del free tier
 - Puedes configurar presupuestos en Google Cloud Console
 
@@ -357,6 +373,7 @@ firebase emulators:start --only functions,firestore
 ### Ver Logs en Tiempo Real
 
 **Opción 1: Terminal**
+
 ```bash
 # Ver logs de todas las funciones
 firebase functions:log
@@ -369,12 +386,14 @@ firebase functions:log --level error
 ```
 
 **Opción 2: Google Cloud Console**
+
 1. Ve a https://console.cloud.google.com
 2. **Logging** → **Logs Explorer**
 3. Filtra por función o fecha
 4. Logs más detallados que Firebase Console
 
 **Opción 3: VS Code (Recomendado)**
+
 ```bash
 # Instalar Firebase Extension para VS Code
 # Ver logs directamente en el editor
@@ -383,18 +402,21 @@ firebase functions:log --level error
 ### Errores Comunes
 
 #### Error: "No FCM tokens found"
+
 ```typescript
 // Causa: Usuario no ha permitido notificaciones
 // Solución: Verificar que FCM esté configurado en el frontend
 ```
 
 #### Error: "Permission denied"
+
 ```typescript
 // Causa: Reglas de seguridad de Firestore
 // Solución: Verificar firestore.rules
 ```
 
 #### Error: "Function timeout"
+
 ```typescript
 // Causa: Función tarda >60 segundos
 // Solución: Optimizar código o aumentar timeout
@@ -429,6 +451,7 @@ export const myFunction = onDocumentUpdated({
    - Permisos granulares por función
 
 **Mejores prácticas aplicadas:**
+
 ```typescript
 // ✅ BUENO: Validar datos de entrada
 if (!event.data.after.data()) {
@@ -455,6 +478,7 @@ const humidity: number = data.humidity ?? 0;
 ### Dashboard de Firebase
 
 **Métricas clave disponibles:**
+
 1. **Invocaciones** → Cuántas veces se ejecutó cada función
 2. **Tiempo de ejecución** → Promedio y percentil 95
 3. **Memoria usada** → Optimización de recursos
@@ -462,6 +486,7 @@ const humidity: number = data.humidity ?? 0;
 5. **Costo** → Estimación en tiempo real
 
 **Alertas configurables:**
+
 ```bash
 # En Google Cloud Console:
 # 1. Crear alerta de presupuesto
@@ -488,16 +513,16 @@ gcloud functions describe onLowHumidityAlert \
 
 ### Casos que Requieren Deploy
 
-| Cambio | Requiere Deploy | Automático |
-|--------|-----------------|------------|
-| Editar código de función | ✅ SÍ | ❌ Manual |
-| Cambiar trigger type | ✅ SÍ | ❌ Manual |
-| Cambiar schedule | ✅ SÍ | ❌ Manual |
-| Actualizar dependencias | ✅ SÍ | ❌ Manual |
-| Cambiar variables de entorno | ✅ SÍ | ❌ Manual |
-| Datos en Firestore | ❌ NO | ✅ Auto |
-| Frontend en Vercel | ❌ NO | ✅ Auto |
-| Reglas de Firestore | ✅ SÍ | ❌ Manual |
+| Cambio                       | Requiere Deploy | Automático |
+| ---------------------------- | --------------- | ---------- |
+| Editar código de función     | ✅ SÍ           | ❌ Manual  |
+| Cambiar trigger type         | ✅ SÍ           | ❌ Manual  |
+| Cambiar schedule             | ✅ SÍ           | ❌ Manual  |
+| Actualizar dependencias      | ✅ SÍ           | ❌ Manual  |
+| Cambiar variables de entorno | ✅ SÍ           | ❌ Manual  |
+| Datos en Firestore           | ❌ NO           | ✅ Auto    |
+| Frontend en Vercel           | ❌ NO           | ✅ Auto    |
+| Reglas de Firestore          | ✅ SÍ           | ❌ Manual  |
 
 ### Comando Rápido
 
@@ -535,11 +560,13 @@ Usuarios: 10,000+
 ```
 
 **Cold Start (Inicio en Frío):**
+
 - Primera ejecución: ~1-2 segundos
 - Ejecuciones posteriores: ~100-200ms
 - Firebase mantiene instancias calientes si hay tráfico
 
 **Optimización:**
+
 ```typescript
 // Usar min instances para evitar cold starts
 export const onLowHumidityAlert = onDocumentUpdated({
@@ -558,6 +585,7 @@ export const onLowHumidityAlert = onDocumentUpdated({
 ### ✅ SÍ, Muy Fácil
 
 **Opción 1: Usando Git**
+
 ```bash
 # 1. Volver al commit anterior
 git log --oneline -5
@@ -571,12 +599,14 @@ git checkout sprint-4
 ```
 
 **Opción 2: Desde Firebase Console**
+
 1. Ve a **Functions** → Selecciona función
 2. Click en **"View source"**
 3. Click en **"Rollback to previous version"**
 4. Confirma
 
 **Opción 3: Backup Manual**
+
 ```bash
 # Antes de deploy, hacer backup
 cp -r functions functions-backup-$(date +%Y%m%d)
@@ -594,6 +624,7 @@ firebase deploy --only functions
 ### ✅ Todo Está Configurado Correctamente
 
 **Tu setup actual es:**
+
 - ✅ **Profesional** → Usa mejores prácticas
 - ✅ **Económico** → 100% dentro del free tier
 - ✅ **Escalable** → Maneja 1 o 10,000 usuarios
@@ -618,16 +649,19 @@ firebase deploy --only functions
 **Si tienes problemas:**
 
 1. **Revisa logs:**
+
    ```bash
    firebase functions:log --only onLowHumidityAlert
    ```
 
 2. **Verifica estado:**
+
    ```bash
    firebase functions:list
    ```
 
 3. **Prueba localmente:**
+
    ```bash
    firebase emulators:start --only functions,firestore
    ```
