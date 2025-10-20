@@ -25,7 +25,7 @@ interface UseReadingsReturn {
 }
 
 export function useReadings(
-  sensorId: string,
+  sensorId: string | null | undefined,
   timeRange: TimeRange
 ): UseReadingsReturn {
   const [readings, setReadings] = useState<Reading[]>([]);
