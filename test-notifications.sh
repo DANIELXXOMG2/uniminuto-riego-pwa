@@ -39,9 +39,11 @@ case $option in
         echo ""
         echo -e "${YELLOW}📤 Invocando función de test...${NC}"
         echo ""
-        firebase functions:shell << EOF
-sendTestNotification()
-EOF
+        echo "Esta función se ejecuta automáticamente cada 24 horas."
+        echo "Para probarla ahora, usa Firebase Console o espera al siguiente ciclo."
+        echo ""
+        echo -e "${BLUE}Ver logs:${NC}"
+        firebase functions:log --only sendTestNotification
         ;;
     
     2)
@@ -51,37 +53,9 @@ EOF
         read -p "ID de línea de riego (ej: line-1): " lineId
         read -p "Valor de humedad (ej: 15): " humidity
         
-        # Crear script Node.js temporal
-        cat > /tmp/test-humidity.js << SCRIPT
-const admin = require('firebase-admin');
-admin.initializeApp();
-const db = admin.firestore();
-
-async function testLowHumidity() {
-  try {
-    await db.collection('irrigationLines').doc('$lineId').set({
-      nombre: 'Línea de Test',
-      humidity: parseFloat('$humidity'),
-      isActive: false,
-      lastUpdated: admin.firestore.FieldValue.serverTimestamp()
-    }, { merge: true });
-    
-    console.log('✅ Documento actualizado. Espera a que se dispare la Function...');
-    console.log('Revisa los logs con: firebase functions:log --only onLowHumidityAlert');
-    process.exit(0);
-  } catch (error) {
-    console.error('❌ Error:', error);
-    process.exit(1);
-  }
-}
-
-testLowHumidity();
-SCRIPT
-        
-        echo -e "${BLUE}Ejecutando en Firebase...${NC}"
-        cd /home/danielxxomg/proyectos/uniminuto-riego-pwa/functions
-        node /tmp/test-humidity.js
-        rm /tmp/test-humidity.js
+        echo -e "${BLUE}Ejecutando script de prueba...${NC}"
+        cd /home/danielxxomg/proyectos/uniminuto-riego-pwa
+        node scripts/test-low-humidity.js "$lineId" "$humidity"
         ;;
     
     3)
@@ -91,37 +65,9 @@ SCRIPT
         read -p "ID de línea de riego (ej: line-1): " lineId
         read -p "Nuevo estado (true/false): " newState
         
-        # Crear script Node.js temporal
-        cat > /tmp/test-status.js << SCRIPT
-const admin = require('firebase-admin');
-admin.initializeApp();
-const db = admin.firestore();
-
-async function testStatusChange() {
-  try {
-    const isActive = '$newState' === 'true';
-    
-    await db.collection('irrigationLines').doc('$lineId').update({
-      isActive: isActive,
-      lastUpdated: admin.firestore.FieldValue.serverTimestamp()
-    });
-    
-    console.log('✅ Estado actualizado. Espera a que se dispare la Function...');
-    console.log('Revisa los logs con: firebase functions:log --only onIrrigationStatusChange');
-    process.exit(0);
-  } catch (error) {
-    console.error('❌ Error:', error);
-    process.exit(1);
-  }
-}
-
-testStatusChange();
-SCRIPT
-        
-        echo -e "${BLUE}Ejecutando en Firebase...${NC}"
-        cd /home/danielxxomg/proyectos/uniminuto-riego-pwa/functions
-        node /tmp/test-status.js
-        rm /tmp/test-status.js
+        echo -e "${BLUE}Ejecutando script de prueba...${NC}"
+        cd /home/danielxxomg/proyectos/uniminuto-riego-pwa
+        node scripts/test-status-change.js "$lineId" "$newState"
         ;;
     
     4)
@@ -151,48 +97,8 @@ SCRIPT
         echo -e "${YELLOW}🔑 Tokens FCM de usuarios:${NC}"
         echo ""
         
-        # Crear script Node.js temporal
-        cat > /tmp/get-tokens.js << 'SCRIPT'
-const admin = require('firebase-admin');
-admin.initializeApp();
-const db = admin.firestore();
-
-async function getTokens() {
-  try {
-    const usersSnapshot = await db.collection('users').get();
-    
-    console.log(`\n📊 Total usuarios: ${usersSnapshot.size}\n`);
-    
-    for (const doc of usersSnapshot.docs) {
-      const data = doc.data();
-      const tokens = data.fcmTokens || [];
-      const role = data.role || 'user';
-      
-      console.log(`👤 ${doc.id} (${role})`);
-      console.log(`   Email: ${data.email || 'N/A'}`);
-      console.log(`   Tokens: ${tokens.length}`);
-      
-      if (tokens.length > 0) {
-        tokens.forEach((token, idx) => {
-          console.log(`   ${idx + 1}. ${token.substring(0, 20)}...`);
-        });
-      }
-      console.log('');
-    }
-    
-    process.exit(0);
-  } catch (error) {
-    console.error('❌ Error:', error);
-    process.exit(1);
-  }
-}
-
-getTokens();
-SCRIPT
-        
-        cd /home/danielxxomg/proyectos/uniminuto-riego-pwa/functions
-        node /tmp/get-tokens.js
-        rm /tmp/get-tokens.js
+        cd /home/danielxxomg/proyectos/uniminuto-riego-pwa
+        node scripts/get-fcm-tokens.js
         ;;
     
     6)

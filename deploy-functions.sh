@@ -44,7 +44,8 @@ echo ""
 # Compilar Functions
 echo -e "${YELLOW}🔨 Compilando Functions...${NC}"
 cd functions
-npm run build
+bun run lint
+bun run build
 
 if [ $? -eq 0 ]; then
     echo -e "${GREEN}✅ Compilación exitosa${NC}"

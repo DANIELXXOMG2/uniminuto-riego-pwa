@@ -2,7 +2,7 @@
 // Los Service Workers no pueden acceder a variables de entorno directamente,
 // por lo que necesitan obtenerla desde este endpoint
 
-import { NextResponse } from 'next/server';
+import { NextResponse } from "next/server";
 
 export async function GET() {
   const firebaseConfig = {
@@ -16,7 +16,7 @@ export async function GET() {
 
   return NextResponse.json(firebaseConfig, {
     headers: {
-      'Cache-Control': 'public, max-age=3600', // Cachear por 1 hora
+      "Cache-Control": "public, max-age=3600", // Cachear por 1 hora
     },
   });
 }

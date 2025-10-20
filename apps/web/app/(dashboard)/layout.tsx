@@ -1,11 +1,11 @@
-'use client';
+"use client";
 
-import { useEffect, useState } from 'react';
-import { useRouter } from 'next/navigation';
-import { Bell, Droplets, Menu, CheckCircle } from 'lucide-react';
-import { Button } from '@/components/ui/button';
-import { useAuth } from '@/lib/AuthProvider';
-import { useFCM } from '@/lib/useFCM';
+import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
+import { Bell, Droplets, Menu, CheckCircle } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { useAuth } from "@/lib/AuthProvider";
+import { useFCM } from "@/lib/useFCM";
 
 export default function DashboardLayout({
   children,
@@ -15,36 +15,43 @@ export default function DashboardLayout({
   const { user, loading } = useAuth();
   const router = useRouter();
   const [showNotificationToast, setShowNotificationToast] = useState(false);
-  const [notificationContent, setNotificationContent] = useState({ title: '', body: '' });
+  const [notificationContent, setNotificationContent] = useState({
+    title: "",
+    body: "",
+  });
 
   // Configurar FCM y manejar notificaciones en primer plano
-  const { token, loading: fcmLoading, error: fcmError, requestPermission, isSupported } = useFCM(
-    (title, body) => {
-      // Mostrar notificación como toast cuando la app está en primer plano
-      setNotificationContent({ title, body });
-      setShowNotificationToast(true);
-      
-      // Auto-ocultar después de 5 segundos
-      setTimeout(() => {
-        setShowNotificationToast(false);
-      }, 5000);
-    }
-  );
+  const {
+    token,
+    loading: fcmLoading,
+    error: fcmError,
+    requestPermission,
+    isSupported,
+  } = useFCM((title, body) => {
+    // Mostrar notificación como toast cuando la app está en primer plano
+    setNotificationContent({ title, body });
+    setShowNotificationToast(true);
+
+    // Auto-ocultar después de 5 segundos
+    setTimeout(() => {
+      setShowNotificationToast(false);
+    }, 5000);
+  });
 
   // Verificar autenticación y redirigir si es necesario
   useEffect(() => {
     if (!loading && !user) {
-      router.push('/login');
+      router.push("/login");
     }
   }, [loading, user, router]);
 
   // Log de estado de FCM para debugging
   useEffect(() => {
     if (token) {
-      console.log('📱 FCM Token disponible');
+      console.log("📱 FCM Token disponible");
     }
     if (fcmError) {
-      console.error('❌ Error FCM:', fcmError);
+      console.error("❌ Error FCM:", fcmError);
     }
   }, [token, fcmError]);
 
@@ -81,7 +88,9 @@ export default function DashboardLayout({
                 <Droplets className="w-5 h-5 text-white" />
               </div>
               <div>
-                <h1 className="text-lg font-bold text-gray-900">UNIMINUTO Riego</h1>
+                <h1 className="text-lg font-bold text-gray-900">
+                  UNIMINUTO Riego
+                </h1>
                 <p className="text-xs text-gray-500 hidden sm:block">
                   Sistema Automatizado
                 </p>
@@ -155,10 +164,12 @@ export default function DashboardLayout({
                     size="sm"
                     className="bg-white text-blue-600 hover:bg-blue-50"
                   >
-                    {fcmLoading ? 'Activando...' : 'Activar'}
+                    {fcmLoading ? "Activando..." : "Activar"}
                   </Button>
                   <Button
-                    onClick={() => {/* Podemos implementar un "recordar después" */}}
+                    onClick={() => {
+                      /* Podemos implementar un "recordar después" */
+                    }}
                     size="sm"
                     variant="ghost"
                     className="text-white hover:bg-white/10"
@@ -177,15 +188,15 @@ export default function DashboardLayout({
         <div className="fixed bottom-4 right-4 z-40">
           <div className="bg-green-500 text-white rounded-lg shadow-lg p-3 flex items-center gap-2 animate-in slide-in-from-bottom duration-300">
             <CheckCircle className="w-5 h-5" />
-            <span className="text-sm font-medium">Notificaciones activadas</span>
+            <span className="text-sm font-medium">
+              Notificaciones activadas
+            </span>
           </div>
         </div>
       )}
 
       {/* Contenido Principal */}
-      <main className="container mx-auto px-4 py-6 max-w-7xl">
-        {children}
-      </main>
+      <main className="container mx-auto px-4 py-6 max-w-7xl">{children}</main>
     </div>
   );
 }

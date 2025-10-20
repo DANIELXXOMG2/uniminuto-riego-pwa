@@ -1,10 +1,74 @@
-# Compiled JavaScript files
+# ═══════════════════════════════════════════════════════════
+# Firebase Cloud Functions - .gitignore
+# Sistema de Riego Inteligente - Backend
+# ═══════════════════════════════════════════════════════════
+
+# ─────────────────────────────────────────────────────────
+# Compiled Output (TypeScript → JavaScript)
+# ─────────────────────────────────────────────────────────
+lib/
 lib/**/*.js
 lib/**/*.js.map
+*.js.map
 
-# TypeScript v1 declaration files
-typings/
-
-# Node.js dependency directory
+# ─────────────────────────────────────────────────────────
+# Dependencies
+# ─────────────────────────────────────────────────────────
 node_modules/
+.pnp
+.pnp.js
+
+# Bun
+bun.lockb
+
+# ─────────────────────────────────────────────────────────
+# TypeScript
+# ─────────────────────────────────────────────────────────
+*.tsbuildinfo
+typings/
+*.d.ts.map
+
+# ─────────────────────────────────────────────────────────
+# Environment Variables & Secrets
+# ─────────────────────────────────────────────────────────
+.env
+.env.local
+.env.*.local
+*.env
+!.env.example
+
+# Firebase Admin SDK Service Account Keys
+**/serviceAccountKey.json
+**/service-account-key.json
+firebase-adminsdk-*.json
+
+# ─────────────────────────────────────────────────────────
+# Testing
+# ─────────────────────────────────────────────────────────
+coverage/
+.nyc_output/
+test-results/
+
+# ─────────────────────────────────────────────────────────
+# Logs
+# ─────────────────────────────────────────────────────────
+*.log
+npm-debug.log*
+yarn-debug.log*
+firebase-debug.log*
+functions-debug.log*
+
+# ─────────────────────────────────────────────────────────
+# IDE
+# ─────────────────────────────────────────────────────────
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# ─────────────────────────────────────────────────────────
+# Misc
+# ─────────────────────────────────────────────────────────
+.DS_Store
 *.local
+.cache/
