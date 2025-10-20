@@ -1,5 +1,19 @@
 {
-  "dependencies": {
-    "firebase-admin": "^13.5.0"
+  "name": "uniminuto-riego-pwa",
+  "private": true,
+  "scripts": {
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "lint": "bun run lint:web && bun run lint:functions",
+    "lint:web": "cd apps/web && bun run lint",
+    "lint:functions": "cd functions && bun run lint",
+    "knip": "knip",
+    "knip:production": "knip --production",
+    "check:all": "bun run format:check && bun run lint && bun run knip:production",
+    "fix:all": "bun run format && bun run lint"
+  },
+  "devDependencies": {
+    "knip": "^5.66.1",
+    "prettier": "^3.6.2"
   }
 }

@@ -5,11 +5,13 @@
 Este proyecto incluye 4 Cloud Functions para gestionar notificaciones push automáticas:
 
 ### 1. `onLowHumidityAlert` 🌡️
+
 **Trigger:** `onDocumentUpdated` en `irrigationLines/{lineId}`
 
 **Propósito:** Detectar cuando la humedad de una línea de riego cae por debajo del umbral crítico (20%).
 
 **Comportamiento:**
+
 - Se activa cada vez que se actualiza un documento en `irrigationLines`
 - Compara la humedad anterior vs. la nueva
 - Si la humedad cruza por debajo de 20% (y antes estaba por encima):
@@ -19,6 +21,7 @@ Este proyecto incluye 4 Cloud Functions para gestionar notificaciones push autom
   - Limpia tokens inválidos automáticamente
 
 **Datos enviados:**
+
 ```javascript
 {
   type: "low_humidity",
@@ -33,11 +36,13 @@ Este proyecto incluye 4 Cloud Functions para gestionar notificaciones push autom
 ---
 
 ### 2. `onIrrigationStatusChange` 💧
+
 **Trigger:** `onDocumentUpdated` en `irrigationLines/{lineId}`
 
 **Propósito:** Notificar cuando se activa o desactiva el riego en una línea.
 
 **Comportamiento:**
+
 - Se activa cada vez que se actualiza un documento en `irrigationLines`
 - Compara el estado `isActive` anterior vs. el nuevo
 - Si el estado cambió:
@@ -46,6 +51,7 @@ Este proyecto incluye 4 Cloud Functions para gestionar notificaciones push autom
   - Incluye información de la línea y humedad actual
 
 **Datos enviados (activado):**
+
 ```javascript
 {
   type: "irrigation_started",
@@ -58,6 +64,7 @@ Este proyecto incluye 4 Cloud Functions para gestionar notificaciones push autom
 ```
 
 **Datos enviados (desactivado):**
+
 ```javascript
 {
   type: "irrigation_stopped",
@@ -72,11 +79,13 @@ Este proyecto incluye 4 Cloud Functions para gestionar notificaciones push autom
 ---
 
 ### 3. `onSensorFailureCheck` 🔍
+
 **Trigger:** `onSchedule` - Cada 1 hora
 
 **Propósito:** Detectar sensores que no están reportando datos.
 
 **Comportamiento:**
+
 - Se ejecuta automáticamente cada hora
 - Verifica el campo `lastUpdated` de cada línea
 - Si alguna línea no se ha actualizado en la última hora:
@@ -85,6 +94,7 @@ Este proyecto incluye 4 Cloud Functions para gestionar notificaciones push autom
   - Notifica a todos los administradores
 
 **Datos enviados:**
+
 ```javascript
 {
   type: "sensor_failure",
@@ -99,16 +109,19 @@ Este proyecto incluye 4 Cloud Functions para gestionar notificaciones push autom
 ---
 
 ### 4. `sendTestNotification` 🧪
+
 **Trigger:** `onSchedule` - Cada 24 horas (o manual)
 
 **Propósito:** Función de prueba para verificar que las notificaciones funcionan.
 
 **Comportamiento:**
+
 - Se puede ejecutar manualmente
 - Envía notificación de prueba a todos los administradores
 - Útil para verificar que el sistema funciona correctamente
 
 **Datos enviados:**
+
 ```javascript
 {
   type: "test",
@@ -123,11 +136,13 @@ Este proyecto incluye 4 Cloud Functions para gestionar notificaciones push autom
 ### Requisitos Previos
 
 1. **Firebase CLI instalado:**
+
    ```bash
    npm install -g firebase-tools
    ```
 
 2. **Autenticado en Firebase:**
+
    ```bash
    firebase login
    ```
@@ -200,7 +215,7 @@ export const onSensorFailureCheck = onSchedule(
     // "every 2 hours"
     // "0 */4 * * *" (cada 4 horas)
     timeZone: "America/Bogota",
-  },
+  }
   // ...
 );
 ```
@@ -239,12 +254,14 @@ firebase emulators:start --only functions,firestore
 ```
 
 Esto iniciará:
+
 - Functions emulator en `http://localhost:5001`
 - Firestore emulator en `http://localhost:8080`
 
 ### Probar Manualmente
 
 1. **Crear una línea de riego de prueba en Firestore:**
+
    ```javascript
    // En Firestore Console o usando el emulador
    collection: irrigationLines
@@ -258,10 +275,11 @@ Esto iniciará:
    ```
 
 2. **Actualizar la humedad para activar alerta:**
+
    ```javascript
    // Cambiar humidity a 18 (por debajo del umbral)
    {
-     humidity: 18
+     humidity: 18;
    }
    ```
 
@@ -269,7 +287,7 @@ Esto iniciará:
    ```javascript
    // Cambiar isActive a true
    {
-     isActive: true
+     isActive: true;
    }
    ```
 
@@ -294,11 +312,12 @@ Las funciones usan logging estructurado:
 logger.info("Humidity changed", {
   lineId: "line_1",
   before: 25,
-  after: 18
+  after: 18,
 });
 ```
 
 Puedes filtrar logs en Cloud Console por:
+
 - Severidad (info, warn, error)
 - Función específica
 - Rango de tiempo
@@ -310,16 +329,19 @@ Puedes filtrar logs en Cloud Console por:
 ### Cálculo Estimado
 
 **Plan Spark (Gratis):**
+
 - 125,000 invocaciones/mes
 - 40,000 GB-seg de tiempo de cómputo
 - 5 GB de salida de red
 
 **Plan Blaze (Pago por uso):**
+
 - $0.40 por millón de invocaciones
 - $0.0000025 por GB-seg
 - Primeros 2 millones de invocaciones gratis cada mes
 
 **Ejemplo de uso:**
+
 - `onLowHumidityAlert`: ~100 invocaciones/día = 3,000/mes
 - `onIrrigationStatusChange`: ~200 invocaciones/día = 6,000/mes
 - `onSensorFailureCheck`: 24 invocaciones/día = 720/mes
@@ -340,10 +362,10 @@ service cloud.firestore {
     // Solo administradores pueden escribir en irrigationLines
     match /irrigationLines/{lineId} {
       allow read: if request.auth != null;
-      allow write: if request.auth != null && 
+      allow write: if request.auth != null &&
                     get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
     }
-    
+
     // Los usuarios solo pueden leer/escribir sus propios datos
     match /users/{userId} {
       allow read, write: if request.auth != null && request.auth.uid == userId;
@@ -361,6 +383,7 @@ firebase functions:config:set someservice.key="THE API KEY"
 ```
 
 Luego en el código:
+
 ```typescript
 const apiKey = functions.config().someservice.key;
 ```
@@ -372,11 +395,13 @@ const apiKey = functions.config().someservice.key;
 ### "Function deployment failed"
 
 1. Verifica que estés autenticado:
+
    ```bash
    firebase login --reauth
    ```
 
 2. Verifica que el proyecto sea correcto:
+
    ```bash
    firebase use uniminuto-riego-pwa
    ```
@@ -445,6 +470,7 @@ const apiKey = functions.config().someservice.key;
 ## 🎉 ¡Funciones Listas!
 
 Las Cloud Functions están configuradas y listas para:
+
 - ✅ Detectar humedad baja automáticamente
 - ✅ Notificar cambios en el estado de riego
 - ✅ Alertar sobre sensores que no reportan

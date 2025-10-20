@@ -7,9 +7,9 @@
  * 3. onIrrigationStatusChange - Notifica cuando se activa/desactiva el riego
  */
 
-import {setGlobalOptions} from "firebase-functions/v2/options";
-import {onDocumentUpdated} from "firebase-functions/v2/firestore";
-import {onSchedule} from "firebase-functions/v2/scheduler";
+import { setGlobalOptions } from "firebase-functions/v2/options";
+import { onDocumentUpdated } from "firebase-functions/v2/firestore";
+import { onSchedule } from "firebase-functions/v2/scheduler";
 import * as admin from "firebase-admin";
 import * as logger from "firebase-functions/logger";
 
@@ -44,14 +44,15 @@ async function getAdminTokens(): Promise<string[]> {
   const tokens: string[] = [];
 
   try {
-    const usersSnapshot = await admin.firestore()
+    const usersSnapshot = await admin
+      .firestore()
       .collection("users")
       .where("role", "==", "admin")
       .get();
 
     usersSnapshot.forEach((doc) => {
       const userData = doc.data();
-      const userTokens = userData.fcmTokens || [];
+      const userTokens = (userData.fcmTokens as string[] | undefined) || [];
       tokens.push(...userTokens);
     });
 
@@ -80,13 +81,13 @@ async function cleanInvalidTokens(
 
   userDocs.forEach((doc) => {
     const userData = doc.data();
-    const userTokens = userData.fcmTokens || [];
+    const userTokens = (userData.fcmTokens as string[] | undefined) || [];
     const validTokens = userTokens.filter(
       (token: string) => !invalidTokens.includes(token)
     );
 
     if (validTokens.length !== userTokens.length) {
-      batch.update(doc.ref, {fcmTokens: validTokens});
+      batch.update(doc.ref, { fcmTokens: validTokens });
     }
   });
 
@@ -119,7 +120,7 @@ export const onLowHumidityAlert = onDocumentUpdated(
 
       logger.info(
         `Humidity changed for ${lineTitle}: ` +
-        `${beforeHumidity}% → ${afterHumidity}%`
+          `${beforeHumidity}% → ${afterHumidity}%`
       );
 
       // Verificar si la humedad cruzó por debajo del umbral
@@ -141,8 +142,7 @@ export const onLowHumidityAlert = onDocumentUpdated(
         const message: admin.messaging.MulticastMessage = {
           notification: {
             title: "⚠️ Alerta de Humedad Baja",
-            body:
-              `${lineTitle} tiene ${afterHumidity}% de humedad (crítico)`,
+            body: `${lineTitle} tiene ${afterHumidity}% de humedad (crítico)`,
           },
           data: {
             type: "low_humidity",
@@ -156,12 +156,11 @@ export const onLowHumidityAlert = onDocumentUpdated(
         };
 
         // Enviar notificación
-        const response =
-          await admin.messaging().sendEachForMulticast(message);
+        const response = await admin.messaging().sendEachForMulticast(message);
 
         logger.info(
           `✅ Notifications sent: ${response.successCount} successful, ` +
-          `${response.failureCount} failed`
+            `${response.failureCount} failed`
         );
 
         // Limpiar tokens inválidos
@@ -172,8 +171,7 @@ export const onLowHumidityAlert = onDocumentUpdated(
               const error = resp.error;
               if (
                 error?.code === "messaging/invalid-registration-token" ||
-                error?.code ===
-                  "messaging/registration-token-not-registered"
+                error?.code === "messaging/registration-token-not-registered"
               ) {
                 invalidTokens.push(tokens[idx]);
               }
@@ -181,7 +179,8 @@ export const onLowHumidityAlert = onDocumentUpdated(
           });
 
           if (invalidTokens.length > 0) {
-            const userDocs = await admin.firestore()
+            const userDocs = await admin
+              .firestore()
               .collection("users")
               .where("role", "==", "admin")
               .get();
@@ -224,7 +223,7 @@ export const onIrrigationStatusChange = onDocumentUpdated(
 
       logger.info(
         `Irrigation status changed for ${lineTitle}: ` +
-        `${beforeActive} → ${afterActive}`
+          `${beforeActive} → ${afterActive}`
       );
 
       // Obtener tokens de administradores
@@ -236,13 +235,11 @@ export const onIrrigationStatusChange = onDocumentUpdated(
       }
 
       // Preparar mensaje según el estado
-      const title = afterActive ?
-        "💧 Riego Activado" :
-        "⏸️ Riego Desactivado";
+      const title = afterActive ? "💧 Riego Activado" : "⏸️ Riego Desactivado";
 
-      const body = afterActive ?
-        `${lineTitle} ha iniciado el riego automático` :
-        `${lineTitle} ha detenido el riego`;
+      const body = afterActive
+        ? `${lineTitle} ha iniciado el riego automático`
+        : `${lineTitle} ha detenido el riego`;
 
       const message: admin.messaging.MulticastMessage = {
         notification: {
@@ -250,8 +247,7 @@ export const onIrrigationStatusChange = onDocumentUpdated(
           body,
         },
         data: {
-          type:
-            afterActive ? "irrigation_started" : "irrigation_stopped",
+          type: afterActive ? "irrigation_started" : "irrigation_stopped",
           lineId: lineId,
           lineName: lineTitle,
           isActive: afterActive.toString(),
@@ -262,12 +258,11 @@ export const onIrrigationStatusChange = onDocumentUpdated(
       };
 
       // Enviar notificación
-      const response =
-        await admin.messaging().sendEachForMulticast(message);
+      const response = await admin.messaging().sendEachForMulticast(message);
 
       logger.info(
         `✅ Notifications sent: ${response.successCount} successful, ` +
-        `${response.failureCount} failed`
+          `${response.failureCount} failed`
       );
 
       // Limpiar tokens inválidos
@@ -286,7 +281,8 @@ export const onIrrigationStatusChange = onDocumentUpdated(
         });
 
         if (invalidTokens.length > 0) {
-          const userDocs = await admin.firestore()
+          const userDocs = await admin
+            .firestore()
             .collection("users")
             .where("role", "==", "admin")
             .get();
@@ -318,7 +314,8 @@ export const onSensorFailureCheck = onSchedule(
       const timeoutThreshold = now - SENSOR_TIMEOUT;
 
       // Obtener todas las líneas de riego
-      const linesSnapshot = await admin.firestore()
+      const linesSnapshot = await admin
+        .firestore()
         .collection("irrigationLines")
         .get();
 
@@ -330,12 +327,15 @@ export const onSensorFailureCheck = onSchedule(
 
       linesSnapshot.forEach((doc) => {
         const data = doc.data();
-        const lastUpdated = data.lastUpdated?.toMillis() || 0;
+        const lastUpdated =
+          (
+            data.lastUpdated as admin.firestore.Timestamp | undefined
+          )?.toMillis() || 0;
 
         if (lastUpdated < timeoutThreshold) {
           failedSensors.push({
             id: doc.id,
-            title: data.title || `Línea ${doc.id}`,
+            title: (data.title as string | undefined) || `Línea ${doc.id}`,
             lastUpdate: lastUpdated,
           });
         }
@@ -358,8 +358,9 @@ export const onSensorFailureCheck = onSchedule(
 
       // Enviar notificación por cada sensor fallido
       for (const sensor of failedSensors) {
-        const timeSinceUpdate =
-          Math.floor((now - sensor.lastUpdate) / (60 * 1000));
+        const timeSinceUpdate = Math.floor(
+          (now - sensor.lastUpdate) / (60 * 1000)
+        );
 
         const message: admin.messaging.MulticastMessage = {
           notification: {
@@ -379,11 +380,10 @@ export const onSensorFailureCheck = onSchedule(
           tokens: tokens,
         };
 
-        const response =
-          await admin.messaging().sendEachForMulticast(message);
+        const response = await admin.messaging().sendEachForMulticast(message);
         logger.info(
           `Sensor failure notification for ${sensor.title}: ` +
-          `${response.successCount} sent`
+            `${response.successCount} sent`
         );
       }
 
@@ -418,8 +418,7 @@ export const sendTestNotification = onSchedule(
       const message: admin.messaging.MulticastMessage = {
         notification: {
           title: "🧪 Notificación de Prueba",
-          body:
-            "El sistema de notificaciones está funcionando correctamente",
+          body: "El sistema de notificaciones está funcionando correctamente",
         },
         data: {
           type: "test",
@@ -428,8 +427,7 @@ export const sendTestNotification = onSchedule(
         tokens: tokens,
       };
 
-      const response =
-        await admin.messaging().sendEachForMulticast(message);
+      const response = await admin.messaging().sendEachForMulticast(message);
       logger.info(
         `✅ Test notifications sent: ${response.successCount} successful`
       );
