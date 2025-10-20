@@ -1,0 +1,41 @@
+{
+  "$schema": "https://unpkg.com/knip@latest/schema.json",
+  "workspaces": {
+    ".": {
+      "entry": [],
+      "project": []
+    },
+    "apps/web": {
+      "entry": [
+        "app/**/*.{ts,tsx}",
+        "components/**/*.{ts,tsx}",
+        "lib/**/*.{ts,tsx}",
+        "next.config.mjs"
+      ],
+      "project": ["**/*.{ts,tsx,js,mjs}"],
+      "ignore": [".next/**", "next-env.d.ts", "**/*.d.ts", "public/**"]
+    },
+    "functions": {
+      "entry": ["src/index.ts"],
+      "project": ["src/**/*.ts"],
+      "ignore": ["lib/**"]
+    }
+  },
+  "ignore": [
+    "**/*.config.{js,mjs,ts}",
+    "**/scripts/**",
+    "**/__tests__/**",
+    "**/*.test.{ts,tsx}",
+    "**/*.spec.{ts,tsx}"
+  ],
+  "ignoreDependencies": [
+    "firebase-tools",
+    "firebase-functions-test",
+    "@radix-ui/react-slot",
+    "@radix-ui/react-switch",
+    "class-variance-authority",
+    "clsx",
+    "tailwind-merge",
+    "next-pwa"
+  ]
+}

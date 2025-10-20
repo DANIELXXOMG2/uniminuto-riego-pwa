@@ -1,24 +1,24 @@
 /**
  * Script de ejemplo para enviar notificaciones FCM desde el backend
- * 
+ *
  * REQUISITOS:
  * 1. Instalar Firebase Admin SDK: npm install firebase-admin
  * 2. Descargar la clave privada de servicio desde Firebase Console:
  *    Configuración del proyecto → Cuentas de servicio → Generar nueva clave privada
  * 3. Guardar el archivo JSON en un lugar seguro (NO lo subas a git)
- * 
+ *
  * USO:
  * node send-notification.js
  */
 
-const admin = require('firebase-admin');
+const admin = require("firebase-admin");
 
 // Inicializar Firebase Admin SDK
 // Opción 1: Usando archivo de credenciales
-const serviceAccount = require('./path/to/serviceAccountKey.json');
+const serviceAccount = require("./path/to/serviceAccountKey.json");
 
 admin.initializeApp({
-  credential: admin.credential.cert(serviceAccount)
+  credential: admin.credential.cert(serviceAccount),
 });
 
 // Opción 2: Usando variables de entorno (recomendado para producción)
@@ -34,7 +34,11 @@ admin.initializeApp({
 async function sendNotificationToUser(userId, title, body, data = {}) {
   try {
     // Obtener tokens del usuario desde Firestore
-    const userDoc = await admin.firestore().collection('users').doc(userId).get();
+    const userDoc = await admin
+      .firestore()
+      .collection("users")
+      .doc(userId)
+      .get();
     const fcmTokens = userDoc.data()?.fcmTokens || [];
 
     if (fcmTokens.length === 0) {
@@ -46,48 +50,53 @@ async function sendNotificationToUser(userId, title, body, data = {}) {
     const message = {
       notification: {
         title,
-        body
+        body,
       },
       data: {
         ...data,
-        timestamp: Date.now().toString()
-      }
+        timestamp: Date.now().toString(),
+      },
     };
 
     // Enviar a todos los tokens del usuario
     const results = await Promise.allSettled(
-      fcmTokens.map(token => 
-        admin.messaging().send({ ...message, token })
-      )
+      fcmTokens.map((token) => admin.messaging().send({ ...message, token }))
     );
 
     // Procesar resultados
-    const successful = results.filter(r => r.status === 'fulfilled').length;
-    const failed = results.filter(r => r.status === 'rejected').length;
+    const successful = results.filter((r) => r.status === "fulfilled").length;
+    const failed = results.filter((r) => r.status === "rejected").length;
 
-    console.log(`✅ Notificaciones enviadas: ${successful} exitosas, ${failed} fallidas`);
+    console.log(
+      `✅ Notificaciones enviadas: ${successful} exitosas, ${failed} fallidas`
+    );
 
     // Remover tokens inválidos
     const invalidTokens = [];
     results.forEach((result, index) => {
-      if (result.status === 'rejected') {
+      if (result.status === "rejected") {
         const error = result.reason;
-        if (error.code === 'messaging/invalid-registration-token' ||
-            error.code === 'messaging/registration-token-not-registered') {
+        if (
+          error.code === "messaging/invalid-registration-token" ||
+          error.code === "messaging/registration-token-not-registered"
+        ) {
           invalidTokens.push(fcmTokens[index]);
         }
       }
     });
 
     if (invalidTokens.length > 0) {
-      await admin.firestore().collection('users').doc(userId).update({
-        fcmTokens: admin.firestore.FieldValue.arrayRemove(...invalidTokens)
-      });
+      await admin
+        .firestore()
+        .collection("users")
+        .doc(userId)
+        .update({
+          fcmTokens: admin.firestore.FieldValue.arrayRemove(...invalidTokens),
+        });
       console.log(`🗑️ Removidos ${invalidTokens.length} tokens inválidos`);
     }
-
   } catch (error) {
-    console.error('❌ Error al enviar notificación:', error);
+    console.error("❌ Error al enviar notificación:", error);
   }
 }
 
@@ -105,15 +114,16 @@ async function sendNotificationToUsers(userIds, title, body, data = {}) {
  */
 async function sendNotificationByRole(role, title, body, data = {}) {
   try {
-    const usersSnapshot = await admin.firestore()
-      .collection('users')
-      .where('role', '==', role)
+    const usersSnapshot = await admin
+      .firestore()
+      .collection("users")
+      .where("role", "==", role)
       .get();
 
-    const userIds = usersSnapshot.docs.map(doc => doc.id);
+    const userIds = usersSnapshot.docs.map((doc) => doc.id);
     await sendNotificationToUsers(userIds, title, body, data);
   } catch (error) {
-    console.error('❌ Error al enviar notificación por rol:', error);
+    console.error("❌ Error al enviar notificación por rol:", error);
   }
 }
 
@@ -122,14 +132,14 @@ async function sendNotificationByRole(role, title, body, data = {}) {
 // Ejemplo 1: Notificar cuando una línea de riego se activa
 async function notifyIrrigationStarted(lineId, lineName) {
   await sendNotificationByRole(
-    'admin',
-    '💧 Línea de Riego Activada',
+    "admin",
+    "💧 Línea de Riego Activada",
     `La línea '${lineName}' ha iniciado el riego automático`,
     {
-      type: 'irrigation_started',
+      type: "irrigation_started",
       lineId,
       lineName,
-      action: 'view_line'
+      action: "view_line",
     }
   );
 }
@@ -137,43 +147,38 @@ async function notifyIrrigationStarted(lineId, lineName) {
 // Ejemplo 2: Notificar humedad baja
 async function notifyLowHumidity(lineId, lineName, humidity) {
   await sendNotificationByRole(
-    'admin',
-    '⚠️ Humedad Baja Detectada',
+    "admin",
+    "⚠️ Humedad Baja Detectada",
     `La línea '${lineName}' tiene ${humidity}% de humedad`,
     {
-      type: 'low_humidity',
+      type: "low_humidity",
       lineId,
       lineName,
       humidity: humidity.toString(),
-      action: 'view_line'
+      action: "view_line",
     }
   );
 }
 
 // Ejemplo 3: Notificar error en el sistema
 async function notifySystemError(errorMessage) {
-  await sendNotificationByRole(
-    'admin',
-    '🚨 Error del Sistema',
-    errorMessage,
-    {
-      type: 'system_error',
-      severity: 'high',
-      action: 'view_admin'
-    }
-  );
+  await sendNotificationByRole("admin", "🚨 Error del Sistema", errorMessage, {
+    type: "system_error",
+    severity: "high",
+    action: "view_admin",
+  });
 }
 
 // Ejemplo 4: Notificación programada de mantenimiento
 async function notifyMaintenance(scheduledTime) {
   await sendNotificationByRole(
-    'admin',
-    '🔧 Mantenimiento Programado',
+    "admin",
+    "🔧 Mantenimiento Programado",
     `Se realizará mantenimiento del sistema el ${scheduledTime}`,
     {
-      type: 'maintenance',
+      type: "maintenance",
       scheduledTime,
-      action: 'view_dashboard'
+      action: "view_dashboard",
     }
   );
 }
@@ -182,11 +187,11 @@ async function notifyMaintenance(scheduledTime) {
 async function sendTestNotification(userId) {
   await sendNotificationToUser(
     userId,
-    '🧪 Notificación de Prueba',
-    'Esta es una notificación de prueba del sistema de riego',
+    "🧪 Notificación de Prueba",
+    "Esta es una notificación de prueba del sistema de riego",
     {
-      type: 'test',
-      timestamp: new Date().toISOString()
+      type: "test",
+      timestamp: new Date().toISOString(),
     }
   );
 }
@@ -215,5 +220,5 @@ module.exports = {
   notifyLowHumidity,
   notifySystemError,
   notifyMaintenance,
-  sendTestNotification
+  sendTestNotification,
 };
