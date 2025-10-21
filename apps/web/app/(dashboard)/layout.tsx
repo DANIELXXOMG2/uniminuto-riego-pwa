@@ -13,8 +13,15 @@ import {
   Users,
   LogOut,
   X,
+  BellRing,
+  CheckCheck,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
 import { useAuth } from "@/lib/AuthProvider";
 import { useFCM } from "@/lib/useFCM";
 import { signOut } from "firebase/auth";
@@ -300,16 +307,104 @@ export default function DashboardLayout({
 
             {/* Iconos de acción */}
             <div className="flex items-center gap-2">
-              <Button
-                variant="ghost"
-                size="icon"
-                className="relative"
-                aria-label="Notificaciones"
-              >
-                <Bell className="h-5 w-5" />
-                {/* Indicador de notificaciones */}
-                <span className="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full"></span>
-              </Button>
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="relative"
+                    aria-label="Notificaciones"
+                  >
+                    <Bell className="h-5 w-5" />
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-80 p-0" align="end">
+                  {/* Encabezado */}
+                  <div className="p-4 border-b flex items-center justify-between">
+                    <h4 className="font-medium">Notificaciones</h4>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="text-xs text-muted-foreground h-auto p-1"
+                    >
+                      <CheckCheck className="h-3 w-3 mr-1" />
+                      Marcar todas como leídas
+                    </Button>
+                  </div>
+
+                  {/* Lista de notificaciones */}
+                  <div className="p-4 max-h-60 overflow-y-auto">
+                    {/* Notificaciones de ejemplo */}
+                    <div className="space-y-3">
+                      <div className="flex gap-3 p-2 hover:bg-gray-50 rounded-lg cursor-pointer">
+                        <div className="bg-blue-100 p-2 rounded-full h-fit">
+                          <BellRing className="h-4 w-4 text-blue-600" />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-medium text-gray-900">
+                            Sistema de riego activado
+                          </p>
+                          <p className="text-xs text-gray-500 mt-0.5">
+                            El riego automático se ha iniciado
+                          </p>
+                          <p className="text-xs text-gray-400 mt-1">
+                            Hace 5 minutos
+                          </p>
+                        </div>
+                      </div>
+
+                      <div className="flex gap-3 p-2 hover:bg-gray-50 rounded-lg cursor-pointer">
+                        <div className="bg-yellow-100 p-2 rounded-full h-fit">
+                          <BellRing className="h-4 w-4 text-yellow-600" />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-medium text-gray-900">
+                            Humedad baja detectada
+                          </p>
+                          <p className="text-xs text-gray-500 mt-0.5">
+                            Sensor 1 reporta 25% de humedad
+                          </p>
+                          <p className="text-xs text-gray-400 mt-1">
+                            Hace 1 hora
+                          </p>
+                        </div>
+                      </div>
+
+                      <div className="flex gap-3 p-2 hover:bg-gray-50 rounded-lg cursor-pointer">
+                        <div className="bg-green-100 p-2 rounded-full h-fit">
+                          <BellRing className="h-4 w-4 text-green-600" />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-medium text-gray-900">
+                            Riego completado
+                          </p>
+                          <p className="text-xs text-gray-500 mt-0.5">
+                            Ciclo de riego finalizado exitosamente
+                          </p>
+                          <p className="text-xs text-gray-400 mt-1">
+                            Hace 2 horas
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Placeholder para cuando no hay notificaciones */}
+                    {/* <p className="text-sm text-muted-foreground text-center py-4">
+                      No hay notificaciones nuevas
+                    </p> */}
+                  </div>
+
+                  {/* Pie de página */}
+                  <div className="p-2 border-t text-center">
+                    <Link
+                      href="/notificaciones"
+                      className="text-xs text-blue-600 hover:underline inline-block py-1"
+                    >
+                      Ver todas las notificaciones
+                    </Link>
+                  </div>
+                </PopoverContent>
+              </Popover>
             </div>
           </div>
         </header>
