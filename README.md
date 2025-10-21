@@ -70,7 +70,74 @@ PWA Offline-First para la supervisión y control de un sistema de riego intelige
 
 ---
 
-## 👥 Autores
+## � Administración de Roles
+
+El sistema incluye un script para asignar roles a usuarios registrados. Los roles disponibles son:
+
+- **`admin`**: Acceso completo al sistema, incluida la gestión de usuarios.
+- **`supervisor`**: Acceso a monitoreo y control, sin gestión de usuarios.
+- **`estudiante`**: Acceso de solo lectura para monitoreo.
+
+### Configuración Inicial
+
+Antes de usar el script, necesitas obtener las credenciales de administrador de Firebase:
+
+1. **Obtener el Service Account Key:**
+   - Ve a [Firebase Console](https://console.firebase.google.com/)
+   - Selecciona tu proyecto
+   - Ve a **Project Settings** (⚙️) → **Service Accounts**
+   - Haz clic en **Generate New Private Key**
+   - Se descargará un archivo JSON (por ejemplo: `mi-proyecto-firebase-adminsdk-xxxxx.json`)
+
+2. **Colocar el archivo en la ruta correcta:**
+
+   ```bash
+   # Desde la raíz del proyecto
+   mv ~/Downloads/mi-proyecto-firebase-adminsdk-xxxxx.json ./functions/serviceAccountKey.json
+   ```
+
+   ⚠️ **Importante**: Este archivo contiene credenciales sensibles. Asegúrate de que esté en `.gitignore` y **nunca** lo subas a Git.
+
+### Uso del Script
+
+Desde la raíz del proyecto:
+
+```bash
+node setAdmin.js <email> [role]
+```
+
+**Ejemplos:**
+
+```bash
+# Asignar rol de administrador (por defecto)
+node setAdmin.js usuario@ejemplo.com
+
+# Asignar roles específicos
+node setAdmin.js usuario@ejemplo.com admin
+node setAdmin.js usuario@ejemplo.com supervisor
+node setAdmin.js usuario@ejemplo.com estudiante
+```
+
+El script actualiza tanto los **Custom Claims** de Firebase Authentication como el documento del usuario en **Firestore**. El usuario deberá cerrar sesión y volver a iniciar para que los cambios surtan efecto.
+
+---
+
+## 🚀 Despliegue en Vercel
+
+Para desplegar la aplicación web en producción, consulta la guía completa:
+
+📄 **[VERCEL_DEPLOYMENT_GUIDE.md](./apps/web/VERCEL_DEPLOYMENT_GUIDE.md)**
+
+La guía incluye:
+
+- Configuración del proyecto monorepo
+- Lista de variables de entorno obligatorias
+- Pasos de verificación post-deploy
+- Troubleshooting común
+
+---
+
+## �👥 Autores
 
 - **Daniel Sebastián Bello Hernández**
 - **Jorge Alberto Roncancio Enciso**
