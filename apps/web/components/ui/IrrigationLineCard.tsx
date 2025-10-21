@@ -9,6 +9,7 @@ interface IrrigationLineCardProps {
   isActive: boolean;
   humidity: number;
   onToggle: (checked: boolean) => void;
+  disabled?: boolean;
 }
 
 export default function IrrigationLineCard({
@@ -16,9 +17,10 @@ export default function IrrigationLineCard({
   isActive,
   humidity,
   onToggle,
+  disabled = false,
 }: IrrigationLineCardProps) {
   return (
-    <Card className="overflow-hidden hover:shadow-lg transition-shadow">
+    <Card className={`overflow-hidden hover:shadow-lg transition-shadow ${disabled ? 'opacity-75' : ''}`}>
       <CardHeader className="pb-3">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
@@ -46,6 +48,7 @@ export default function IrrigationLineCard({
           <Switch
             checked={isActive}
             onCheckedChange={onToggle}
+            disabled={disabled}
             aria-label={`Activar/Desactivar ${title}`}
           />
         </div>

@@ -14,7 +14,7 @@ export function AdminRoute({ children }: AdminRouteProps) {
 
   useEffect(() => {
     // Si no está cargando y el usuario no es administrador, redirigir
-    if (!loading && role !== 'administrator') {
+    if (!loading && role !== 'admin') {
       router.push('/');
     }
   }, [loading, role, router]);
@@ -29,7 +29,7 @@ export function AdminRoute({ children }: AdminRouteProps) {
   }
 
   // Si no es administrador, mostrar mensaje de acceso denegado
-  if (role !== 'administrator') {
+  if (role !== 'admin') {
     return (
       <div className="flex items-center justify-center min-h-screen">
         <div className="text-center space-y-4">

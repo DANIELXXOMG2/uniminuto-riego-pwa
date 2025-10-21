@@ -1,8 +1,9 @@
 'use client';
 
 import { createContext, useContext, useEffect, useState } from 'react';
-import { User, onAuthStateChanged, getIdTokenResult } from 'firebase/auth';
-import { auth } from './firebase';
+import { User, onAuthStateChanged } from 'firebase/auth';
+import { doc, onSnapshot } from 'firebase/firestore';
+import { auth, db } from './firebase';
 
 // Tipo del contexto de autenticación
 interface AuthContextType {
@@ -25,30 +26,53 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    // Variable para guardar la función de cleanup de Firestore
+    let unsubscribeFirestore: (() => void) | undefined;
+
     // Suscribirse a los cambios de autenticación
-    const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
+    const unsubscribeAuth = onAuthStateChanged(auth, (currentUser) => {
       setUser(currentUser);
       
       if (currentUser) {
-        try {
-          // Obtener el token con los claims personalizados
-          const tokenResult = await getIdTokenResult(currentUser, true);
-          // Extraer el rol del claim
-          const userRole = tokenResult.claims.role as string | undefined;
-          setRole(userRole || null);
-        } catch (error) {
-          console.error('Error al obtener el rol del usuario:', error);
-          setRole(null);
-        }
+        // Leer el rol desde Firestore en tiempo real
+        const userDocRef = doc(db, 'users', currentUser.uid);
+        
+        unsubscribeFirestore = onSnapshot(
+          userDocRef,
+          (snapshot) => {
+            if (snapshot.exists()) {
+              // Obtener el rol del documento
+              const userRole = snapshot.data()?.role || null;
+              setRole(userRole);
+              console.log('✅ Rol obtenido desde Firestore:', userRole);
+            } else {
+              // Usuario autenticado pero sin documento en Firestore
+              console.warn('⚠️ Usuario autenticado sin documento en Firestore');
+              setRole(null);
+            }
+            setLoading(false);
+          },
+          (error) => {
+            // Manejo de errores
+            console.error('❌ Error al leer rol desde Firestore:', error);
+            setRole(null);
+            setLoading(false);
+          }
+        );
       } else {
+        // No hay usuario autenticado
         setRole(null);
+        setLoading(false);
       }
-      
-      setLoading(false);
     });
 
-    // Limpiar la suscripción cuando el componente se desmonte
-    return () => unsubscribe();
+    // Limpiar suscripciones cuando el componente se desmonte
+    return () => {
+      unsubscribeAuth();
+      if (unsubscribeFirestore) {
+        unsubscribeFirestore();
+      }
+    };
   }, []);
 
   return (

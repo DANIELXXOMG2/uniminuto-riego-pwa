@@ -5,6 +5,7 @@ import IrrigationLineCard from "@/components/ui/IrrigationLineCard";
 import { WifiOff, Droplets, CheckCircle, XCircle } from "lucide-react";
 import { useIrrigationData } from "@/lib/useIrrigationData";
 import { useSensors } from "@/lib/useSensors";
+import { useAuth } from "@/lib/AuthProvider";
 import { doc, updateDoc } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 
@@ -18,6 +19,7 @@ export default function DashboardPage() {
   const [isOffline] = useState(false); // Simular modo offline
   const { lines, loading, error } = useIrrigationData();
   const { sensors, loading: sensorsLoading, error: sensorsError } = useSensors();
+  const { role } = useAuth(); // Obtener el rol del usuario
   const [toasts, setToasts] = useState<Toast[]>([]);
 
   const showToast = (message: string, type: "success" | "error") => {
@@ -183,6 +185,23 @@ export default function DashboardPage() {
         </div>
       )}
 
+      {/* Banner de Solo Lectura para Estudiantes */}
+      {role === 'estudiante' && (
+        <div className="bg-blue-50 border border-blue-200 text-blue-800 px-4 py-3 rounded-lg shadow-sm">
+          <div className="flex items-center gap-3">
+            <div className="bg-blue-100 p-2 rounded-full flex-shrink-0">
+              <Droplets className="w-5 h-5 text-blue-600" />
+            </div>
+            <div>
+              <p className="font-semibold text-blue-900">Modo Solo Lectura</p>
+              <p className="text-sm text-blue-700">
+                Puedes ver el estado del sistema, pero no realizar cambios. Contacta a tu supervisor si necesitas permisos adicionales.
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Encabezado */}
       <div className="space-y-2">
         <h2 className="text-2xl font-bold text-gray-900">
@@ -239,6 +258,7 @@ export default function DashboardPage() {
               isActive={line.isActive}
               humidity={line.humidity}
               onToggle={(checked) => handleToggleLine(line.id, checked)}
+              disabled={role === 'estudiante'}
             />
           ))}
         </div>
