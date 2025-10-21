@@ -181,6 +181,16 @@ local-test/
 **/DRAFT_*
 **/TODO_LOCAL.md
 
+# Arduino - Credenciales y configuración local
+packages/arduino/src/config.h
+packages/arduino/*.bin
+packages/arduino/*.elf
+packages/arduino/.pio/
+packages/arduino/.pioenvs/
+packages/arduino/.piolibdeps/
+packages/arduino/.clang_complete
+packages/arduino/.gcc-flags.json
+
 # ─────────────────────────────────────────────────────────
 # Miscellaneous
 # ─────────────────────────────────────────────────────────

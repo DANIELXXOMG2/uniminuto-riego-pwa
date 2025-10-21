@@ -86,6 +86,27 @@ Lista todos los tokens FCM registrados.
 node scripts/get-fcm-tokens.js
 ```
 
+### `scripts/init-firestore-for-arduino.js` 🆕
+
+Inicializa la estructura de Firestore requerida para el firmware ESP32/ESP8266 v3.0.
+
+**Uso:**
+
+```bash
+node scripts/init-firestore-for-arduino.js
+```
+
+**Acciones:**
+
+- ✅ Crea documento de configuración del dispositivo (`config/device_config`)
+- 💧 Crea documentos de líneas de riego con sensores asignados
+- 🌡️ Crea documentos de sensores con metadata
+- 📈 Crea lectura de ejemplo para testing
+- 📊 Muestra recomendaciones de índices compuestos
+- 🔒 Muestra reglas de seguridad recomendadas
+
+**Nota:** Ejecutar este script antes de compilar y cargar el firmware Arduino.
+
 ---
 
 ## 🔧 Requisitos

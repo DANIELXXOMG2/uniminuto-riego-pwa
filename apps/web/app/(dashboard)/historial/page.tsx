@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useMemo, useEffect } from "react";
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, ChevronLeft, ChevronRight } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import {
@@ -39,10 +39,31 @@ export default function HistorialPage() {
 
   // Seleccionar automáticamente el primer sensor cuando se carguen
   useEffect(() => {
-    if (sensors.length > 0 && !selectedSensorId) {
+    if (sensors.length > 0 && selectedSensorId === null) {
       setSelectedSensorId(sensors[0].id);
     }
   }, [sensors, selectedSensorId]);
+
+  // Funciones de navegación entre sensores
+  const handlePrevSensor = () => {
+    if (!selectedSensorId || sensors.length <= 1) return;
+    
+    const currentIndex = sensors.findIndex(s => s.id === selectedSensorId);
+    if (currentIndex <= 0) return;
+    
+    const newIndex = currentIndex - 1;
+    setSelectedSensorId(sensors[newIndex].id);
+  };
+
+  const handleNextSensor = () => {
+    if (!selectedSensorId || sensors.length <= 1) return;
+    
+    const currentIndex = sensors.findIndex(s => s.id === selectedSensorId);
+    if (currentIndex < 0 || currentIndex >= sensors.length - 1) return;
+    
+    const newIndex = currentIndex + 1;
+    setSelectedSensorId(sensors[newIndex].id);
+  };
 
   // Obtener lecturas del sensor seleccionado
   const { readings, loading, error } = useReadings(
@@ -137,28 +158,64 @@ export default function HistorialPage() {
             >
               Seleccionar Sensor
             </label>
-            <Select
-              value={selectedSensorId || undefined}
-              onValueChange={setSelectedSensorId}
-            >
-              <SelectTrigger
-                id="sensor-select"
-                className="bg-emerald-900/50 border-emerald-700 text-white hover:bg-emerald-800/50"
+            <div className="flex items-center gap-2">
+              {/* Botón Anterior */}
+              <Button
+                variant="outline"
+                size="icon"
+                onClick={handlePrevSensor}
+                disabled={
+                  sensorsLoading ||
+                  sensors.length <= 1 ||
+                  (selectedSensorId !== null &&
+                    sensors.findIndex(s => s.id === selectedSensorId) === 0)
+                }
+                className="bg-emerald-900/50 border-emerald-700 text-white hover:bg-emerald-800/50 disabled:opacity-50"
               >
-                <SelectValue placeholder="Selecciona un sensor" />
-              </SelectTrigger>
-              <SelectContent className="bg-emerald-900 border-emerald-700 text-white">
-                {sensors.map((sensor) => (
-                  <SelectItem
-                    key={sensor.id}
-                    value={sensor.id}
-                    className="focus:bg-emerald-800 focus:text-white"
-                  >
-                    {sensor.title}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+                <ChevronLeft className="h-4 w-4" />
+              </Button>
+              
+              {/* Select */}
+              <Select
+                value={selectedSensorId ?? ""}
+                onValueChange={setSelectedSensorId}
+              >
+                <SelectTrigger
+                  id="sensor-select"
+                  className="flex-1 bg-emerald-900/50 border-emerald-700 text-white hover:bg-emerald-800/50"
+                  disabled={sensorsLoading || sensors.length === 0}
+                >
+                  <SelectValue placeholder={sensorsLoading ? "Cargando sensores..." : "Selecciona un sensor"} />
+                </SelectTrigger>
+                <SelectContent className="bg-emerald-900 border-emerald-700 text-white">
+                  {sensors.map((sensor) => (
+                    <SelectItem
+                      key={sensor.id}
+                      value={sensor.id}
+                      className="focus:bg-emerald-800 focus:text-white"
+                    >
+                      {`${sensor.id} - ${sensor.title}`}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+
+              {/* Botón Siguiente */}
+              <Button
+                variant="outline"
+                size="icon"
+                onClick={handleNextSensor}
+                disabled={
+                  sensorsLoading ||
+                  sensors.length <= 1 ||
+                  (selectedSensorId !== null &&
+                    sensors.findIndex(s => s.id === selectedSensorId) === sensors.length - 1)
+                }
+                className="bg-emerald-900/50 border-emerald-700 text-white hover:bg-emerald-800/50 disabled:opacity-50"
+              >
+                <ChevronRight className="h-4 w-4" />
+              </Button>
+            </div>
           </div>
         )}
 
