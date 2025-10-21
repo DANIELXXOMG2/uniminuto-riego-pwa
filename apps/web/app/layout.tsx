@@ -15,9 +15,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Sistema de Riego Inteligente - Uniminuto",
-  description:
-    "Sistema de monitoreo y control de riego inteligente para gestión eficiente del agua",
+  title: "UNIMINUTO Riego PWA",
+  description: "Sistema de Riego Inteligente PWA Offline-First.",
   manifest: "/manifest.json",
   appleWebApp: {
     capable: true,
@@ -25,12 +24,23 @@ export const metadata: Metadata = {
     title: "Riego Uniminuto",
   },
   icons: {
-    icon: [
-      { url: "/icon-192x192.png", sizes: "192x192", type: "image/png" },
-      { url: "/icon-512x512.png", sizes: "512x512", type: "image/png" },
+    icon: "/icon.svg", // Icono principal (SVG)
+    shortcut: "/icon-192x192.png", // Para PWA y accesos directos
+    apple: "/icon-192x192.png", // Para dispositivos Apple
+    other: [
+      {
+        rel: "icon",
+        url: "/favicon.ico", // Apunta al /public/favicon.ico
+        sizes: "any",
+      },
+      {
+        rel: "icon",
+        url: "/icon.svg",
+        type: "image/svg+xml",
+      },
     ],
-    apple: [{ url: "/icon-192x192.png", sizes: "192x192", type: "image/png" }],
   },
+  themeColor: "#22c55e", // Verde (coincide con manifest.json)
 };
 
 export const viewport: Viewport = {

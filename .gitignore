@@ -205,3 +205,4 @@ lib-cov
 *.tgz
 .yarn-integrity
 .pnpm-debug.log
+.vercel

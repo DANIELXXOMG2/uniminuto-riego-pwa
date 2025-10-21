@@ -49,17 +49,18 @@ export default function LoginPage() {
       await signInWithEmailAndPassword(auth, email, password);
 
       // Asegurar que el documento del usuario exista en Firestore
-      const userCred = auth.currentUser; // Obtener el usuario recién logueado
+      // NOTA: No establecemos el rol aquí para no sobrescribir roles asignados manualmente
+      const userCred = auth.currentUser;
       if (userCred) {
         const userRef = doc(db, "users", userCred.uid);
         await setDoc(
           userRef,
           {
-            email: userCred.email, // Guardar el email
-            // No establecemos el rol aquí, se hará manualmente o por otra función
+            email: userCred.email,
+            lastLogin: new Date().toISOString(),
           },
           { merge: true }
-        ); // merge: true evita sobrescribir si ya existe
+        );
       }
 
       // Si es exitoso, redirigir al dashboard
@@ -108,16 +109,29 @@ export default function LoginPage() {
       const user = result.user;
 
       // Asegurar que el documento del usuario exista en Firestore
-      // Si es un usuario nuevo, se crearán los campos role y createdAt
-      await setDoc(
-        doc(db, "users", user.uid),
-        {
+      // IMPORTANTE: Solo establecer rol "estudiante" para usuarios NUEVOS
+      const userRef = doc(db, "users", user.uid);
+      const isNewUser = result.user.metadata.creationTime === result.user.metadata.lastSignInTime;
+      
+      if (isNewUser) {
+        // Usuario nuevo: establecer rol por defecto
+        await setDoc(userRef, {
           email: user.email,
           role: "estudiante",
           createdAt: new Date().toISOString(),
-        },
-        { merge: true }
-      );
+          lastLogin: new Date().toISOString(),
+        });
+      } else {
+        // Usuario existente: solo actualizar lastLogin, NO tocar el rol
+        await setDoc(
+          userRef,
+          {
+            email: user.email,
+            lastLogin: new Date().toISOString(),
+          },
+          { merge: true }
+        );
+      }
 
       // Redirigir al dashboard
       router.push("/");
