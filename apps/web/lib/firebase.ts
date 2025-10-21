@@ -2,7 +2,7 @@
 // Inicializa Firebase con las credenciales de tu proyecto
 
 import { initializeApp, getApps, FirebaseApp } from 'firebase/app';
-import { getAuth, Auth } from 'firebase/auth';
+import { getAuth, Auth, GoogleAuthProvider } from 'firebase/auth';
 import { 
   initializeFirestore, 
   getFirestore,
@@ -62,6 +62,9 @@ if (typeof window !== 'undefined') {
 // Servicios de Firebase
 export const auth: Auth = getAuth(app);
 export { db };
+
+// Proveedor de Google para autenticación
+export const googleProvider = new GoogleAuthProvider();
 
 // Inicializar Firebase Functions con región us-central1
 export const functions: Functions = getFunctions(app, 'us-central1');
