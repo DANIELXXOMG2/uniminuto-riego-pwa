@@ -15,7 +15,12 @@ import {
   X,
   BellRing,
   CheckCheck,
+  Check,
+  AlertCircle,
+  Loader2,
 } from "lucide-react";
+import { formatDistanceToNow } from "date-fns";
+import { es } from "date-fns/locale";
 import { Button } from "@/components/ui/button";
 import {
   Popover,
@@ -24,8 +29,14 @@ import {
 } from "@/components/ui/popover";
 import { useAuth } from "@/lib/AuthProvider";
 import { useFCM } from "@/lib/useFCM";
+import { useNotifications, Notification } from "@/lib/useNotifications";
 import { signOut } from "firebase/auth";
 import { auth } from "@/lib/firebase";
+
+// Tipo para Firestore Timestamp
+interface FirestoreTimestamp {
+  toDate: () => Date;
+}
 
 export default function DashboardLayout({
   children,
@@ -41,6 +52,16 @@ export default function DashboardLayout({
     title: "",
     body: "",
   });
+
+  // Hook de notificaciones
+  const {
+    notifications,
+    unreadCount,
+    loading: notificationsLoading,
+    error: notificationsError,
+    markAsRead,
+    markAllAsRead,
+  } = useNotifications();
 
   // Configurar FCM y manejar notificaciones en primer plano
   const {
@@ -91,6 +112,34 @@ export default function DashboardLayout({
   useEffect(() => {
     setSidebarOpen(false);
   }, [pathname]);
+
+  // Función auxiliar para formatear timestamp
+  const formatNotificationTime = (timestamp: unknown) => {
+    try {
+      const date = timestamp && typeof timestamp === 'object' && 'toDate' in timestamp 
+        ? (timestamp as FirestoreTimestamp).toDate() 
+        : new Date(timestamp as string | number);
+      return formatDistanceToNow(date, { addSuffix: true, locale: es });
+    } catch {
+      return "Fecha no disponible";
+    }
+  };
+
+  // Función auxiliar para obtener el icono según el tipo de notificación
+  const getNotificationIcon = (type: string) => {
+    switch (type) {
+      case 'low_humidity':
+        return { icon: AlertCircle, color: 'text-yellow-600', bg: 'bg-yellow-100' };
+      case 'irrigation_started':
+      case 'irrigation_stopped':
+        return { icon: Droplets, color: 'text-blue-600', bg: 'bg-blue-100' };
+      case 'sensor_failure':
+      case 'system_alert':
+        return { icon: AlertCircle, color: 'text-red-600', bg: 'bg-red-100' };
+      default:
+        return { icon: BellRing, color: 'text-gray-600', bg: 'bg-gray-100' };
+    }
+  };
 
   // Navegación del sidebar
   const navigationItems = [
@@ -316,6 +365,12 @@ export default function DashboardLayout({
                     aria-label="Notificaciones"
                   >
                     <Bell className="h-5 w-5" />
+                    {/* Indicador de notificaciones no leídas */}
+                    {unreadCount > 0 && (
+                      <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs font-bold rounded-full h-5 w-5 flex items-center justify-center">
+                        {unreadCount > 9 ? '9+' : unreadCount}
+                      </span>
+                    )}
                   </Button>
                 </PopoverTrigger>
                 <PopoverContent className="w-80 p-0" align="end">
@@ -326,6 +381,8 @@ export default function DashboardLayout({
                       variant="ghost"
                       size="sm"
                       className="text-xs text-muted-foreground h-auto p-1"
+                      onClick={markAllAsRead}
+                      disabled={unreadCount === 0}
                     >
                       <CheckCheck className="h-3 w-3 mr-1" />
                       Marcar todas como leídas
@@ -333,76 +390,100 @@ export default function DashboardLayout({
                   </div>
 
                   {/* Lista de notificaciones */}
-                  <div className="p-4 max-h-60 overflow-y-auto">
-                    {/* Notificaciones de ejemplo */}
-                    <div className="space-y-3">
-                      <div className="flex gap-3 p-2 hover:bg-gray-50 rounded-lg cursor-pointer">
-                        <div className="bg-blue-100 p-2 rounded-full h-fit">
-                          <BellRing className="h-4 w-4 text-blue-600" />
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <p className="text-sm font-medium text-gray-900">
-                            Sistema de riego activado
-                          </p>
-                          <p className="text-xs text-gray-500 mt-0.5">
-                            El riego automático se ha iniciado
-                          </p>
-                          <p className="text-xs text-gray-400 mt-1">
-                            Hace 5 minutos
-                          </p>
-                        </div>
+                  <div className="max-h-96 overflow-y-auto">
+                    {/* Estado de carga */}
+                    {notificationsLoading && (
+                      <div className="p-8 text-center">
+                        <Loader2 className="h-6 w-6 animate-spin mx-auto mb-2 text-gray-400" />
+                        <p className="text-sm text-gray-500">Cargando notificaciones...</p>
                       </div>
+                    )}
 
-                      <div className="flex gap-3 p-2 hover:bg-gray-50 rounded-lg cursor-pointer">
-                        <div className="bg-yellow-100 p-2 rounded-full h-fit">
-                          <BellRing className="h-4 w-4 text-yellow-600" />
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <p className="text-sm font-medium text-gray-900">
-                            Humedad baja detectada
-                          </p>
-                          <p className="text-xs text-gray-500 mt-0.5">
-                            Sensor 1 reporta 25% de humedad
-                          </p>
-                          <p className="text-xs text-gray-400 mt-1">
-                            Hace 1 hora
-                          </p>
-                        </div>
+                    {/* Estado de error */}
+                    {notificationsError && (
+                      <div className="p-8 text-center">
+                        <AlertCircle className="h-6 w-6 mx-auto mb-2 text-red-500" />
+                        <p className="text-sm text-red-600">{notificationsError}</p>
                       </div>
+                    )}
 
-                      <div className="flex gap-3 p-2 hover:bg-gray-50 rounded-lg cursor-pointer">
-                        <div className="bg-green-100 p-2 rounded-full h-fit">
-                          <BellRing className="h-4 w-4 text-green-600" />
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <p className="text-sm font-medium text-gray-900">
-                            Riego completado
-                          </p>
-                          <p className="text-xs text-gray-500 mt-0.5">
-                            Ciclo de riego finalizado exitosamente
-                          </p>
-                          <p className="text-xs text-gray-400 mt-1">
-                            Hace 2 horas
-                          </p>
-                        </div>
-                      </div>
-                    </div>
+                    {/* Notificaciones */}
+                    {!notificationsLoading && !notificationsError && (
+                      <>
+                        {notifications.length === 0 ? (
+                          <div className="p-8 text-center">
+                            <Bell className="h-12 w-12 mx-auto mb-3 text-gray-300" />
+                            <p className="text-sm text-gray-500">No hay notificaciones nuevas</p>
+                          </div>
+                        ) : (
+                          <div className="divide-y">
+                            {notifications.map((notification: Notification) => {
+                              const iconData = getNotificationIcon(notification.type);
+                              const Icon = iconData.icon;
+                              
+                              return (
+                                <div
+                                  key={notification.id}
+                                  className={`p-4 hover:bg-gray-50 transition-colors ${
+                                    !notification.read ? 'bg-blue-50/30' : ''
+                                  }`}
+                                >
+                                  <div className="flex gap-3">
+                                    {/* Icono */}
+                                    <div className={`${iconData.bg} p-2 rounded-full h-fit flex-shrink-0`}>
+                                      <Icon className={`h-4 w-4 ${iconData.color}`} />
+                                    </div>
 
-                    {/* Placeholder para cuando no hay notificaciones */}
-                    {/* <p className="text-sm text-muted-foreground text-center py-4">
-                      No hay notificaciones nuevas
-                    </p> */}
+                                    {/* Contenido */}
+                                    <div className="flex-1 min-w-0">
+                                      <div className="flex items-start justify-between gap-2 mb-1">
+                                        <p className="text-sm font-medium text-gray-900">
+                                          {notification.title}
+                                        </p>
+                                        {!notification.read && (
+                                          <button
+                                            onClick={() => markAsRead(notification.id)}
+                                            className="text-blue-600 hover:text-blue-700 flex-shrink-0"
+                                            aria-label="Marcar como leída"
+                                            title="Marcar como leída"
+                                          >
+                                            <Check className="h-4 w-4" />
+                                          </button>
+                                        )}
+                                      </div>
+                                      <p className="text-xs text-gray-600 mb-2">
+                                        {notification.body}
+                                      </p>
+                                      <div className="flex items-center gap-2">
+                                        <p className="text-xs text-gray-400">
+                                          {formatNotificationTime(notification.timestamp)}
+                                        </p>
+                                        {!notification.read && (
+                                          <span className="w-2 h-2 bg-blue-500 rounded-full"></span>
+                                        )}
+                                      </div>
+                                    </div>
+                                  </div>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        )}
+                      </>
+                    )}
                   </div>
 
                   {/* Pie de página */}
-                  <div className="p-2 border-t text-center">
-                    <Link
-                      href="/notificaciones"
-                      className="text-xs text-blue-600 hover:underline inline-block py-1"
-                    >
-                      Ver todas las notificaciones
-                    </Link>
-                  </div>
+                  {notifications.length > 0 && (
+                    <div className="p-2 border-t text-center">
+                      <Link
+                        href="/notificaciones"
+                        className="text-xs text-blue-600 hover:underline inline-block py-1"
+                      >
+                        Ver todas las notificaciones
+                      </Link>
+                    </div>
+                  )}
                 </PopoverContent>
               </Popover>
             </div>
