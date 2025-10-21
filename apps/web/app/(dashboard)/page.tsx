@@ -4,6 +4,7 @@ import { useState } from "react";
 import IrrigationLineCard from "@/components/ui/IrrigationLineCard";
 import { WifiOff, Droplets, CheckCircle, XCircle } from "lucide-react";
 import { useIrrigationData } from "@/lib/useIrrigationData";
+import { useSensors } from "@/lib/useSensors";
 import { doc, updateDoc } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 
@@ -16,6 +17,7 @@ interface Toast {
 export default function DashboardPage() {
   const [isOffline] = useState(false); // Simular modo offline
   const { lines, loading, error } = useIrrigationData();
+  const { sensors, loading: sensorsLoading, error: sensorsError } = useSensors();
   const [toasts, setToasts] = useState<Toast[]>([]);
 
   const showToast = (message: string, type: "success" | "error") => {
@@ -72,7 +74,7 @@ export default function DashboardPage() {
 
         {/* Skeleton de Estadísticas */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-          {[1, 2, 3, 4].map((i) => (
+          {[1, 2, 3, 4, 5].map((i) => (
             <div
               key={i}
               className="bg-white p-4 rounded-lg shadow-sm border border-gray-200 animate-pulse"
@@ -216,6 +218,12 @@ export default function DashboardPage() {
               lines.reduce((acc, l) => acc + l.humidity, 0) / lines.length
             )}
             %
+          </p>
+        </div>
+        <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-200">
+          <p className="text-sm text-gray-600">Sensores Totales</p>
+          <p className="text-2xl font-bold text-purple-600">
+            {sensorsLoading ? "..." : sensorsError ? "Error" : sensors.length}
           </p>
         </div>
       </div>

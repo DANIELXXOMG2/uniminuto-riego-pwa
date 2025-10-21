@@ -1,12 +1,13 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { collection, getDocs } from "firebase/firestore";
+import { collection, getDocs, query, orderBy } from "firebase/firestore";
 import { db } from "./firebase";
 
 export interface Sensor {
   id: string;
   title: string;
+  status?: string;
 }
 
 interface UseSensorsReturn {
@@ -17,7 +18,7 @@ interface UseSensorsReturn {
 
 /**
  * Hook personalizado para obtener la lista de sensores disponibles
- * desde la colección de irrigationLines
+ * desde la colección sensors
  */
 export function useSensors(): UseSensorsReturn {
   const [sensors, setSensors] = useState<Sensor[]>([]);
@@ -30,20 +31,18 @@ export function useSensors(): UseSensorsReturn {
         setLoading(true);
         setError(null);
 
-        // Obtener todas las líneas de riego que tienen sensores
-        const irrigationLinesRef = collection(db, "irrigationLines");
-        const querySnapshot = await getDocs(irrigationLinesRef);
+        // Obtener todos los sensores de la colección sensors
+        const sensorsRef = collection(db, "sensors");
+        const sensorsQuery = query(sensorsRef, orderBy("title", "asc"));
+        const querySnapshot = await getDocs(sensorsQuery);
 
-        // Mapear los documentos a sensores
-        // Asumimos que cada irrigationLine tiene un sensor asociado
-        // con ID en formato "sensor-{lineId}" o un campo sensorId
+        // Mapear los documentos a objetos Sensor
         const fetchedSensors: Sensor[] = querySnapshot.docs.map((doc) => {
           const data = doc.data();
-          // Si existe un campo sensorId explícito, usarlo; sino, usar el ID del documento
-          const sensorId = data.sensorId || `sensor-${doc.id}`;
           return {
-            id: sensorId,
+            id: doc.id,
             title: data.title || `Sensor ${doc.id}`,
+            status: data.status,
           };
         });
 
