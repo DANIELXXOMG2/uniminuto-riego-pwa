@@ -107,6 +107,36 @@ node scripts/init-firestore-for-arduino.js
 
 **Nota:** Ejecutar este script antes de compilar y cargar el firmware Arduino.
 
+### `scripts/test-ingest-api.js` 🆕
+
+Prueba el API Route `/api/ingest` para ingesta de datos del Arduino.
+
+**Uso:**
+
+```bash
+# Desarrollo (localhost)
+node scripts/test-ingest-api.js
+
+# Producción
+API_URL=https://tu-dominio.vercel.app ARDUINO_API_SECRET=tu_secret node scripts/test-ingest-api.js
+```
+
+**Tests que ejecuta:**
+
+1. ✅ Envío exitoso de lecturas
+2. 🚫 Sin token de autenticación (debe fallar)
+3. 🚫 Token incorrecto (debe fallar)
+4. 🚫 Array de lecturas vacío (debe fallar)
+5. 🚫 Falta propiedad `sensorId` (debe fallar)
+6. 🚫 Falta propiedad `valueVWC` (debe fallar)
+
+**Variables de entorno:**
+
+- `API_URL`: URL del servidor (default: `http://localhost:3000`)
+- `ARDUINO_API_SECRET`: Token de autenticación (default: `test-secret-123`)
+
+**Nota:** Este script valida que el API esté funcionando correctamente antes de integrar con el Arduino.
+
 ---
 
 ## 🔧 Requisitos

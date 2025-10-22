@@ -1,62 +1,50 @@
 /*
-  Sistema de Riego Automatizado con Firebase Firestore - Versión 3.0
+  Sistema de Riego Automatizado - Arduino UNO + ESP-12F (ESP8266)
   ---------------------------------------------------------------
-  - Plataforma: ESP32/ESP8266 (WiFi nativo, no requiere shield externo)
+  - Plataforma: Arduino UNO + módulo ESP-12F vía comandos AT
   - Lee 18 sensores de humedad usando 2 multiplexores 16:1
-  - Envía lecturas individuales a Firebase Firestore
-  - Lee configuración y estado de líneas desde Firestore
-  - Control automático basado en umbrales y estado isActive remoto
+  - Envía datos al endpoint /api/ingest (Vercel/Next.js)
+  - Control local de válvulas basado en umbrales
   - Usa temporizadores no bloqueantes (millis())
-  - Autenticación segura con Firebase
-  - Sincronización de hora con NTP para timestamps precisos
   ---------------------------------------------------------------
-  REQUIERE:
-  - ESP32 o ESP8266
-  - Librerías:
-    * WiFi.h (incluida en ESP32/ESP8266 core)
-    * Firebase ESP Client (Mobizt) - https://github.com/mobizt/Firebase-ESP-Client
-    * ArduinoJson v6+
-    * time.h (para NTP)
+  HARDWARE REQUERIDO:
+  - Arduino UNO
+  - Módulo ESP-12F (ESP8266) con firmware AT
+  - 2 Multiplexores CD74HC4067 (16:1)
+  - 18 Sensores de humedad capacitivos
+  - 3 Electroválvulas con relés
   
-  INSTALACIÓN DE LIBRERÍAS:
-  - Arduino IDE: Tools > Manage Libraries > buscar "Firebase ESP Client"
-  - PlatformIO: añadir "mobizt/Firebase Arduino Client Library for ESP8266 and ESP32" en platformio.ini
+  LIBRERÍAS REQUERIDAS:
+  - SoftwareSerial (incluida en Arduino IDE)
+  - ArduinoJson (instalar desde Library Manager)
   
-  JUSTIFICACIÓN DE LIBRERÍA FIREBASE:
-  - Firebase ESP Client de Mobizt es la más completa y mantenida para ESP32/ESP8266
-  - Soporta autenticación, Firestore, RTDB, Storage, Cloud Messaging
-  - Compatible con el plan gratuito Spark de Firebase
-  - Maneja automáticamente tokens, reconexión y SSL/TLS
+  CONEXIONES:
+  - ESP8266 RX -> Arduino Pin 3 (TX)
+  - ESP8266 TX -> Arduino Pin 2 (RX)
+  - Multiplexores S0-S3 -> Arduino Pins 4-7
+  - MUX1 SIG -> Arduino Pin A0
+  - MUX2 SIG -> Arduino Pin A1
+  - Válvulas -> Arduino Pins 8, 9, 10
 */
 
 // ============================================================================
 // LIBRERÍAS
 // ============================================================================
-#include <WiFi.h>              // Para ESP32 (usar ESP8266WiFi.h si es ESP8266)
-#include <Firebase_ESP_Client.h> // Firebase ESP Client de Mobizt
-#include <ArduinoJson.h>       // Para manejo de JSON
-#include <time.h>              // Para sincronización NTP
-
-// Provee las definiciones de payload y autenticación de Firebase
-#include "addons/TokenHelper.h"
-#include "addons/RTDBHelper.h"
+#include <SoftwareSerial.h>
+#include <ArduinoJson.h>
 
 // ============================================================================
 // CONFIGURACIÓN - Archivo Separado (Credenciales)
 // ============================================================================
-// IMPORTANTE: Copiar config.example.h a config.h y editar con tus credenciales
-// El archivo config.h está en .gitignore y NO se sube a Git
-// Ver CREDENTIALS_MANAGEMENT.md para más información
-
 #include "config.h"
-
-// Si no existe config.h, crear uno basándote en config.example.h:
-//   cp config.example.h config.h
-//   # Luego editar config.h con tus valores reales
 
 // ============================================================================
 // CONFIGURACIÓN DE HARDWARE - PINES
 // ============================================================================
+// ESP8266 - Comunicación Serial
+#define ESP_RX 2
+#define ESP_TX 3
+
 // Multiplexores - Pines de control compartidos (S0-S3)
 const int S0 = 4;
 const int S1 = 5;
@@ -64,61 +52,44 @@ const int S2 = 6;
 const int S3 = 7;
 
 // Multiplexores - Pines de señal analógica
-const int SIG1 = 34; // ESP32 ADC1_CH6 (GPIO 34) - MUX1 (sensores 1-16)
-const int SIG2 = 35; // ESP32 ADC1_CH7 (GPIO 35) - MUX2 (sensores 17-18)
-// Nota: Usa pines ADC1 en ESP32. Para ESP8266, usa A0 y necesitarás un solo MUX o multiplexación por software
+const int SIG1 = A0; // MUX1 (sensores 0-15)
+const int SIG2 = A1; // MUX2 (sensores 16-17)
 
 // Electroválvulas - Pines de salida digital
-const int VALV1 = 25; // Electroválvula línea 1
-const int VALV2 = 26; // Electroválvula línea 2
-const int VALV3 = 27; // Electroválvula línea 3
+const int VALV1 = 8;  // Electroválvula línea 1
+const int VALV2 = 9;  // Electroválvula línea 2
+const int VALV3 = 10; // Electroválvula línea 3
 
 // ============================================================================
-// VARIABLES GLOBALES - CONFIGURACIÓN Y ESTADO
+// OBJETOS GLOBALES
 // ============================================================================
-// Configuración que se sincroniza desde Firestore
-float umbral_linea1 = 30.0;      // Umbral de humedad línea 1 (%)
-float umbral_linea2 = 30.0;      // Umbral de humedad línea 2 (%)
-float umbral_linea3 = 30.0;      // Umbral de humedad línea 3 (%)
-unsigned long intervaloLectura = 600000; // Intervalo entre lecturas (ms) - Default: 10 minutos
+SoftwareSerial esp8266(ESP_RX, ESP_TX); // RX, TX
 
-// Estado remoto de las líneas (leído desde Firestore)
-bool isActiveLine1 = true;       // Estado isActive de línea 1
-bool isActiveLine2 = true;       // Estado isActive de línea 2
-bool isActiveLine3 = true;       // Estado isActive de línea 3
-
+// ============================================================================
+// VARIABLES GLOBALES
+// ============================================================================
 // Arrays para almacenar lecturas de sensores
-float vwc[18];                   // Valores de %VWC de cada sensor (0-17)
-float promedio[3];               // Promedios de cada línea de riego
+float vwc[18];        // Valores de %VWC de cada sensor (0-17)
+float promedio[3];    // Promedios de cada línea de riego
 
-// Temporizadores no bloqueantes
-unsigned long tiempoAnteriorLectura = 0;      // Para lecturas periódicas de sensores
-unsigned long tiempoAnteriorConfig = 0;       // Para sincronización de configuración
-unsigned long tiempoAnteriorEstado = 0;       // Para sincronización de estados isActive
-const unsigned long intervaloConfig = 300000; // Sincronizar config cada 5 minutos
-const unsigned long intervaloEstado = 30000;  // Verificar estados cada 30 segundos
-
-// Objetos de Firebase
-FirebaseData fbdo;               // Objeto para operaciones de Firebase
-FirebaseAuth auth;               // Objeto de autenticación
-FirebaseConfig config;           // Objeto de configuración de Firebase
-
-// Estado de conexión
-bool wifiConnected = false;
-bool firebaseReady = false;
-unsigned long tiempoReconexionWiFi = 0;
-const unsigned long intervaloReconexionWiFi = 30000; // Reintentar WiFi cada 30s
-
-// IDs de sensores y líneas para Firestore (coinciden con tu estructura real)
-const String sensorIds[18] = {
+// IDs de sensores (coinciden con Firestore)
+String sensorIds[18] = {
   "sensor-0", "sensor-1", "sensor-2", "sensor-3", "sensor-4", "sensor-5",
   "sensor-6", "sensor-7", "sensor-8", "sensor-9", "sensor-10", "sensor-11",
   "sensor-12", "sensor-13", "sensor-14", "sensor-15", "sensor-16", "sensor-17"
 };
 
-const String lineIds[3] = {
-  "linea-1", "linea-2", "linea-3"
-};
+// Configuración de umbrales (pueden ser actualizados desde el servidor)
+float umbral_linea1 = 30.0;
+float umbral_linea2 = 30.0;
+float umbral_linea3 = 30.0;
+
+// Temporizadores no bloqueantes
+unsigned long tiempoAnteriorLectura = 0;
+unsigned long intervaloLectura = READING_INTERVAL;
+
+// Estado de conexión WiFi
+bool wifiConnected = false;
 
 // ============================================================================
 // FUNCIONES DE HARDWARE - SENSORES Y VÁLVULAS
@@ -138,12 +109,12 @@ void setChannel(int channel) {
 /**
  * Calcula el porcentaje de humedad volumétrica (VWC) a partir de la lectura ADC
  * Fórmula de calibración específica del sensor capacitivo
- * @param lectura: Valor ADC del sensor (0-4095 en ESP32, 0-1023 en ESP8266)
+ * @param lectura: Valor ADC del sensor (0-1023 en Arduino UNO)
  * @return: Porcentaje de VWC (0-100%)
  */
 float calcularVWC(int lectura) {
   // Fórmula de calibración cuadrática
-  float VWC = -0.000049 * pow(lectura, 2) - 0.0016 * lectura + 47.9;
+  float VWC = -0.00019 * (float)(lectura * lectura) - 0.0064 * (float)lectura + 191.6;
   
   // Limitar valores al rango válido
   if (VWC < 0) VWC = 0;
@@ -159,20 +130,37 @@ float calcularVWC(int lectura) {
  * Sensores 12-17: Línea 3
  */
 void leerSensores() {
+  Serial.println(F(""));
+  Serial.println(F("========================================"));
+  Serial.println(F("LECTURA DE SENSORES"));
+  Serial.println(F("========================================"));
+  
   int index = 0;
   
   // Leer los primeros 16 sensores del MUX1
   for (int canal = 0; canal < 16; canal++) {
     setChannel(canal);
-    delayMicroseconds(50); // Pequeña pausa para estabilización (no bloqueante significativamente)
-    vwc[index++] = calcularVWC(analogRead(SIG1));
+    delay(10); // Pequeña pausa para estabilización
+    int lectura = analogRead(SIG1);
+    vwc[index] = calcularVWC(lectura);
+    Serial.print(sensorIds[index]);
+    Serial.print(F(": "));
+    Serial.print(vwc[index], 2);
+    Serial.println(F("%"));
+    index++;
   }
   
   // Leer los últimos 2 sensores del MUX2 (canales 0 y 1)
   for (int canal = 0; canal < 2; canal++) {
     setChannel(canal);
-    delayMicroseconds(50);
-    vwc[index++] = calcularVWC(analogRead(SIG2));
+    delay(10);
+    int lectura = analogRead(SIG2);
+    vwc[index] = calcularVWC(lectura);
+    Serial.print(sensorIds[index]);
+    Serial.print(F(": "));
+    Serial.print(vwc[index], 2);
+    Serial.println(F("%"));
+    index++;
   }
   
   // Calcular promedios por línea de riego
@@ -180,379 +168,353 @@ void leerSensores() {
   promedio[1] = (vwc[6] + vwc[7] + vwc[8] + vwc[9] + vwc[10] + vwc[11]) / 6.0;
   promedio[2] = (vwc[12] + vwc[13] + vwc[14] + vwc[15] + vwc[16] + vwc[17]) / 6.0;
   
-  // Log de lecturas
-  Serial.println("─────────────────────────────────────────");
-  Serial.println("📊 LECTURAS DE SENSORES");
-  Serial.printf("Línea 1 promedio: %.2f%% (Umbral: %.2f%%)\n", promedio[0], umbral_linea1);
-  Serial.printf("Línea 2 promedio: %.2f%% (Umbral: %.2f%%)\n", promedio[1], umbral_linea2);
-  Serial.printf("Línea 3 promedio: %.2f%% (Umbral: %.2f%%)\n", promedio[2], umbral_linea3);
+  Serial.println(F("----------------------------------------"));
+  Serial.print(F("Linea 1 promedio: "));
+  Serial.print(promedio[0], 2);
+  Serial.print(F("% (Umbral: "));
+  Serial.print(umbral_linea1, 2);
+  Serial.println(F("%)"));
+  
+  Serial.print(F("Linea 2 promedio: "));
+  Serial.print(promedio[1], 2);
+  Serial.print(F("% (Umbral: "));
+  Serial.print(umbral_linea2, 2);
+  Serial.println(F("%)"));
+  
+  Serial.print(F("Linea 3 promedio: "));
+  Serial.print(promedio[2], 2);
+  Serial.print(F("% (Umbral: "));
+  Serial.print(umbral_linea3, 2);
+  Serial.println(F("%)"));
+  Serial.println(F("========================================"));
 }
 
 /**
- * Controla las electroválvulas basándose en:
- * 1. Promedio de humedad < umbral
- * 2. Estado isActive = true (desde Firestore)
- * 
- * La válvula solo se activa si AMBAS condiciones se cumplen
+ * Controla las electroválvulas basándose en promedios de humedad
+ * La válvula se activa si el promedio está por debajo del umbral
  */
 void controlarValvulas() {
+  Serial.println(F(""));
+  Serial.println(F("CONTROL DE VALVULAS"));
+  Serial.println(F("----------------------------------------"));
+  
   // Línea 1
-  if (promedio[0] < umbral_linea1 && isActiveLine1) {
+  if (promedio[0] < umbral_linea1) {
     digitalWrite(VALV1, HIGH);
-    Serial.println("💧 Válvula 1: ACTIVADA");
+    Serial.println(F("Valvula 1: ACTIVADA"));
   } else {
     digitalWrite(VALV1, LOW);
-    if (!isActiveLine1) Serial.println("🚫 Válvula 1: Desactivada (isActive=false)");
+    Serial.println(F("Valvula 1: Desactivada"));
   }
   
   // Línea 2
-  if (promedio[1] < umbral_linea2 && isActiveLine2) {
+  if (promedio[1] < umbral_linea2) {
     digitalWrite(VALV2, HIGH);
-    Serial.println("💧 Válvula 2: ACTIVADA");
+    Serial.println(F("Valvula 2: ACTIVADA"));
   } else {
     digitalWrite(VALV2, LOW);
-    if (!isActiveLine2) Serial.println("🚫 Válvula 2: Desactivada (isActive=false)");
+    Serial.println(F("Valvula 2: Desactivada"));
   }
   
   // Línea 3
-  if (promedio[2] < umbral_linea3 && isActiveLine3) {
+  if (promedio[2] < umbral_linea3) {
     digitalWrite(VALV3, HIGH);
-    Serial.println("💧 Válvula 3: ACTIVADA");
+    Serial.println(F("Valvula 3: ACTIVADA"));
   } else {
     digitalWrite(VALV3, LOW);
-    if (!isActiveLine3) Serial.println("🚫 Válvula 3: Desactivada (isActive=false)");
+    Serial.println(F("Valvula 3: Desactivada"));
   }
+  
+  Serial.println(F("========================================"));
 }
 
 // ============================================================================
-// FUNCIONES DE CONECTIVIDAD - WiFi
+// FUNCIONES ESP8266 - COMANDOS AT
 // ============================================================================
 
 /**
- * Configura e inicia la conexión WiFi
- * Intenta conectar con reintentos y feedback en Serial
+ * Envía un comando AT al ESP8266 y espera respuesta
+ * @param comando: Comando AT a enviar
+ * @param timeout: Tiempo de espera en milisegundos
+ * @return: true si recibe "OK", false en caso contrario
+ */
+bool sendATCommand(String comando, unsigned long timeout) {
+  Serial.print(F("AT CMD: "));
+  Serial.println(comando);
+  
+  esp8266.println(comando);
+  
+  unsigned long startTime = millis();
+  String response = "";
+  
+  while (millis() - startTime < timeout) {
+    while (esp8266.available()) {
+      char c = esp8266.read();
+      response += c;
+      Serial.print(c); // Echo de la respuesta
+    }
+    
+    if (response.indexOf("OK") != -1) {
+      Serial.println(F("-> OK"));
+      return true;
+    }
+    
+    if (response.indexOf("ERROR") != -1) {
+      Serial.println(F("-> ERROR"));
+      return false;
+    }
+  }
+  
+  Serial.println(F("-> TIMEOUT"));
+  return false;
+}
+
+/**
+ * Espera por un prompt específico del ESP8266
+ * @param prompt: String a esperar (ej: ">")
+ * @param timeout: Tiempo de espera en milisegundos
+ * @return: true si encuentra el prompt, false en caso contrario
+ */
+bool waitForPrompt(String prompt, unsigned long timeout) {
+  Serial.print(F("Esperando: "));
+  Serial.println(prompt);
+  
+  unsigned long startTime = millis();
+  String response = "";
+  
+  while (millis() - startTime < timeout) {
+    while (esp8266.available()) {
+      char c = esp8266.read();
+      response += c;
+      Serial.print(c);
+    }
+    
+    if (response.indexOf(prompt) != -1) {
+      Serial.println(F("-> ENCONTRADO"));
+      return true;
+    }
+  }
+  
+  Serial.println(F("-> TIMEOUT"));
+  return false;
+}
+
+/**
+ * Lee y muestra la respuesta del ESP8266
+ * @param timeout: Tiempo de espera en milisegundos
+ */
+void readESP8266Response(unsigned long timeout) {
+  unsigned long startTime = millis();
+  
+  Serial.println(F("ESP8266 Response:"));
+  Serial.println(F("----------------------------------------"));
+  
+  while (millis() - startTime < timeout) {
+    while (esp8266.available()) {
+      char c = esp8266.read();
+      Serial.print(c);
+    }
+  }
+  
+  Serial.println(F(""));
+  Serial.println(F("----------------------------------------"));
+}
+
+/**
+ * Configura la conexión WiFi del ESP8266
+ * Usa comandos AT para configurar modo estación y conectar
  */
 void setupWiFi() {
-  Serial.println("─────────────────────────────────────────");
-  Serial.println("📡 INICIANDO CONEXIÓN WiFi");
-  Serial.printf("SSID: %s\n", WIFI_SSID);
+  Serial.println(F(""));
+  Serial.println(F("========================================"));
+  Serial.println(F("CONFIGURANDO WiFi (ESP8266)"));
+  Serial.println(F("========================================"));
   
-  WiFi.mode(WIFI_STA); // Modo estación (cliente)
-  WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
-  
-  int intentos = 0;
-  while (WiFi.status() != WL_CONNECTED && intentos < 20) {
-    delay(500);
-    Serial.print(".");
-    intentos++;
-  }
-  
-  if (WiFi.status() == WL_CONNECTED) {
-    wifiConnected = true;
-    Serial.println("\n✅ WiFi conectado exitosamente");
-    Serial.print("📶 IP asignada: ");
-    Serial.println(WiFi.localIP());
-    Serial.print("📊 Intensidad de señal: ");
-    Serial.print(WiFi.RSSI());
-    Serial.println(" dBm");
-  } else {
+  // Test de comunicación
+  Serial.println(F("Test de comunicacion..."));
+  if (!sendATCommand(F("AT"), 2000)) {
+    Serial.println(F("ERROR: No se puede comunicar con ESP8266"));
+    Serial.println(F("Verifique conexiones y baudrate"));
     wifiConnected = false;
-    Serial.println("\n❌ Error: No se pudo conectar al WiFi");
-    Serial.println("⚠️  Verifique las credenciales y la disponibilidad de la red");
+    return;
   }
-}
-
-/**
- * Verifica el estado de la conexión WiFi y reconecta si es necesario
- * Debe llamarse periódicamente desde loop()
- */
-void verificarConexionWiFi() {
-  unsigned long tiempoActual = millis();
   
-  if (WiFi.status() != WL_CONNECTED) {
+  // Configurar modo estación (1 = Station)
+  Serial.println(F("Configurando modo estacion..."));
+  if (!sendATCommand(F("AT+CWMODE=1"), 2000)) {
+    Serial.println(F("ERROR: No se pudo configurar modo"));
     wifiConnected = false;
-    
-    // Intentar reconexión cada intervaloReconexionWiFi
-    if (tiempoActual - tiempoReconexionWiFi >= intervaloReconexionWiFi) {
-      tiempoReconexionWiFi = tiempoActual;
-      Serial.println("⚠️  WiFi desconectado. Intentando reconectar...");
-      setupWiFi();
-    }
-  } else {
-    if (!wifiConnected) {
-      wifiConnected = true;
-      Serial.println("✅ WiFi reconectado");
-    }
-  }
-}
-
-// ============================================================================
-// FUNCIONES DE FIREBASE - AUTENTICACIÓN Y CONFIGURACIÓN
-// ============================================================================
-
-/**
- * Configura Firebase y realiza la autenticación inicial
- * Debe llamarse en setup() después de conectar al WiFi
- */
-void setupFirebase() {
-  Serial.println("─────────────────────────────────────────");
-  Serial.println("🔥 CONFIGURANDO FIREBASE");
-  
-  // Asignar API Key
-  config.api_key = FIREBASE_API_KEY;
-  
-  // Asignar credenciales de usuario
-  auth.user.email = USER_EMAIL;
-  auth.user.password = USER_PASSWORD;
-  
-  // Asignar información del proyecto
-  config.database_url = FIREBASE_HOST;
-  
-  // Asignar la función de callback para el estado del token de larga duración
-  config.token_status_callback = tokenStatusCallback; // Función incluida en TokenHelper.h
-  
-  // Configurar límites de reconexión WiFi para Firebase
-  Firebase.reconnectWiFi(true);
-  
-  // Iniciar Firebase con la configuración y autenticación
-  Firebase.begin(&config, &auth);
-  
-  Serial.println("⏳ Autenticando con Firebase...");
-  
-  // Esperar autenticación inicial (máximo 10 segundos)
-  int intentos = 0;
-  while (!Firebase.ready() && intentos < 20) {
-    delay(500);
-    Serial.print(".");
-    intentos++;
-  }
-  
-  if (Firebase.ready()) {
-    firebaseReady = true;
-    Serial.println("\n✅ Firebase autenticado exitosamente");
-    Serial.printf("👤 Usuario: %s\n", USER_EMAIL);
-  } else {
-    firebaseReady = false;
-    Serial.println("\n❌ Error: No se pudo autenticar con Firebase");
-    Serial.println("⚠️  Verifique las credenciales y la configuración del proyecto");
-  }
-}
-
-/**
- * Verifica el estado de Firebase y maneja la renovación de tokens
- */
-bool verificarFirebase() {
-  if (!wifiConnected) {
-    return false;
-  }
-  
-  if (!Firebase.ready()) {
-    firebaseReady = false;
-    Serial.println("⚠️  Firebase no está listo. Token podría haber expirado.");
-    // La librería maneja automáticamente la renovación de tokens
-    return false;
-  }
-  
-  firebaseReady = true;
-  return true;
-}
-
-// ============================================================================
-// FUNCIONES DE FIREBASE - SINCRONIZACIÓN CON FIRESTORE
-// ============================================================================
-
-/**
- * Obtiene la configuración desde Firestore: /config/device_config
- * Actualiza: umbrales de líneas e intervalo de lectura
- */
-void fetchConfigFromFirestore() {
-  if (!verificarFirebase()) {
-    Serial.println("⚠️  No se puede obtener configuración: Firebase no está listo");
     return;
   }
   
-  Serial.println("─────────────────────────────────────────");
-  Serial.println("⚙️  SINCRONIZANDO CONFIGURACIÓN DESDE FIRESTORE");
+  // Conectar a WiFi
+  Serial.println(F("Conectando a WiFi..."));
+  Serial.print(F("SSID: "));
+  Serial.println(WIFI_SSID);
   
-  String documentPath = "config/device_config";
+  String conectCmd = "AT+CWJAP=\"";
+  conectCmd += WIFI_SSID;
+  conectCmd += "\",\"";
+  conectCmd += WIFI_PASSWORD;
+  conectCmd += "\"";
   
-  if (Firebase.Firestore.getDocument(&fbdo, FIREBASE_PROJECT_ID, "", documentPath.c_str())) {
-    Serial.println("✅ Configuración obtenida exitosamente");
-    
-    // Parsear el JSON de respuesta
-    FirebaseJson &json = fbdo.jsonObject();
-    FirebaseJsonData result;
-    
-    // Leer umbrales
-    if (json.get(result, "fields/thresholdLine1/doubleValue")) {
-      umbral_linea1 = result.floatValue;
-      Serial.printf("  • Umbral Línea 1: %.2f%%\n", umbral_linea1);
-    }
-    
-    if (json.get(result, "fields/thresholdLine2/doubleValue")) {
-      umbral_linea2 = result.floatValue;
-      Serial.printf("  • Umbral Línea 2: %.2f%%\n", umbral_linea2);
-    }
-    
-    if (json.get(result, "fields/thresholdLine3/doubleValue")) {
-      umbral_linea3 = result.floatValue;
-      Serial.printf("  • Umbral Línea 3: %.2f%%\n", umbral_linea3);
-    }
-    
-    // Leer intervalo de lectura (en milisegundos)
-    if (json.get(result, "fields/readingInterval/integerValue")) {
-      intervaloLectura = result.intValue;
-      Serial.printf("  • Intervalo de lectura: %lu ms (%.1f min)\n", 
-                    intervaloLectura, intervaloLectura / 60000.0);
-    }
-    
-  } else {
-    Serial.println("❌ Error al obtener configuración");
-    Serial.println(fbdo.errorReason());
-  }
-}
-
-/**
- * Obtiene el estado isActive de las líneas desde Firestore: /irrigationLines/{lineId}
- */
-void fetchLineStatesFromFirestore() {
-  if (!verificarFirebase()) {
-    Serial.println("⚠️  No se puede obtener estados: Firebase no está listo");
+  if (!sendATCommand(conectCmd, 15000)) { // Timeout largo para conexión
+    Serial.println(F("ERROR: No se pudo conectar a WiFi"));
+    Serial.println(F("Verifique SSID, password y cobertura"));
+    wifiConnected = false;
     return;
   }
   
-  Serial.println("─────────────────────────────────────────");
-  Serial.println("🔄 SINCRONIZANDO ESTADOS DE LÍNEAS DESDE FIRESTORE");
+  // Verificar IP asignada
+  Serial.println(F("Obteniendo IP..."));
+  sendATCommand(F("AT+CIFSR"), 2000);
   
-  // Obtener estado de cada línea
-  for (int i = 0; i < 3; i++) {
-    String documentPath = "irrigationLines/" + lineIds[i];
-    
-    if (Firebase.Firestore.getDocument(&fbdo, FIREBASE_PROJECT_ID, "", documentPath.c_str())) {
-      FirebaseJson &json = fbdo.jsonObject();
-      FirebaseJsonData result;
-      
-      if (json.get(result, "fields/isActive/booleanValue")) {
-        bool isActive = result.boolValue;
-        
-        // Actualizar variable global correspondiente
-        switch(i) {
-          case 0: 
-            isActiveLine1 = isActive;
-            Serial.printf("  • Línea 1 (line-001): %s\n", isActive ? "ACTIVA" : "INACTIVA");
-            break;
-          case 1: 
-            isActiveLine2 = isActive;
-            Serial.printf("  • Línea 2 (line-002): %s\n", isActive ? "ACTIVA" : "INACTIVA");
-            break;
-          case 2: 
-            isActiveLine3 = isActive;
-            Serial.printf("  • Línea 3 (line-003): %s\n", isActive ? "ACTIVA" : "INACTIVA");
-            break;
-        }
-      }
-    } else {
-      Serial.printf("❌ Error al obtener estado de %s\n", lineIds[i].c_str());
-      Serial.println(fbdo.errorReason());
-    }
-  }
+  wifiConnected = true;
+  Serial.println(F(""));
+  Serial.println(F("WiFi conectado exitosamente!"));
+  Serial.println(F("========================================"));
 }
 
 /**
- * Envía las lecturas individuales de cada sensor a Firestore
- * Cada lectura se guarda en: /sensors/{sensorId}/readings/{auto-id}
- * Incluye timestamp y valorVWC
+ * Crea el payload JSON con las lecturas de todos los sensores
+ * @return: String con el JSON serializado
  */
-void sendReadingsToFirestore() {
-  if (!verificarFirebase()) {
-    Serial.println("⚠️  No se puede enviar lecturas: Firebase no está listo");
-    return;
-  }
+String crearPayloadJSON() {
+  // Usar StaticJsonDocument con capacidad suficiente
+  // Calculado: ~50 bytes por sensor * 18 + overhead = ~1200 bytes
+  StaticJsonDocument<1536> doc;
   
-  Serial.println("─────────────────────────────────────────");
-  Serial.println("📤 ENVIANDO LECTURAS A FIRESTORE");
+  // Crear array de readings
+  JsonArray readings = doc.createNestedArray("readings");
   
-  // Obtener timestamp actual
-  time_t now = time(nullptr);
-  
-  // Enviar lectura de cada sensor
+  // Agregar cada sensor
   for (int i = 0; i < 18; i++) {
-    String collectionPath = "sensors/" + sensorIds[i] + "/readings";
-    
-    // Crear documento con los campos en formato Firestore
-    FirebaseJson content;
-    
-    // Timestamp - usar serverTimestamp para mejor precisión
-    content.set("fields/timestamp/timestampValue", String(now) + ".000Z");
-    
-    // Valor VWC
-    content.set("fields/valueVWC/doubleValue", vwc[i]);
-    
-    // Enviar a Firestore
-    if (Firebase.Firestore.createDocument(&fbdo, FIREBASE_PROJECT_ID, "", 
-                                          collectionPath.c_str(), content.raw())) {
-      Serial.printf("  ✅ Sensor %s: %.2f%% enviado\n", sensorIds[i].c_str(), vwc[i]);
-    } else {
-      Serial.printf("  ❌ Error al enviar %s: %s\n", 
-                    sensorIds[i].c_str(), fbdo.errorReason().c_str());
-    }
-    
-    // Pequeña pausa entre envíos para no saturar
-    delay(100);
+    JsonObject reading = readings.createNestedObject();
+    reading["sensorId"] = sensorIds[i];
+    reading["valueVWC"] = vwc[i];
   }
   
-  Serial.println("✅ Envío de lecturas completado");
-}
-
-// ============================================================================
-// FUNCIONES DE UTILIDAD - NTP Y TIEMPO
-// ============================================================================
-
-/**
- * Configura el cliente NTP para sincronización de hora
- * Debe llamarse en setup() después de conectar al WiFi
- */
-void setupNTP() {
-  Serial.println("─────────────────────────────────────────");
-  Serial.println("🕐 SINCRONIZANDO HORA CON NTP");
+  // Serializar a String
+  String payload;
+  serializeJson(doc, payload);
   
-  configTime(GMT_OFFSET_SEC, DAYLIGHT_OFFSET_SEC, NTP_SERVER);
-  
-  Serial.print("⏳ Esperando sincronización NTP");
-  
-  int intentos = 0;
-  time_t now = time(nullptr);
-  while (now < 24 * 3600 && intentos < 20) {
-    delay(500);
-    Serial.print(".");
-    now = time(nullptr);
-    intentos++;
-  }
-  
-  if (now >= 24 * 3600) {
-    Serial.println("\n✅ Hora sincronizada exitosamente");
-    struct tm timeinfo;
-    localtime_r(&now, &timeinfo);
-    Serial.print("📅 Fecha y hora actual: ");
-    Serial.println(asctime(&timeinfo));
-  } else {
-    Serial.println("\n⚠️  Advertencia: No se pudo sincronizar la hora con NTP");
-    Serial.println("⚠️  Los timestamps podrían ser incorrectos");
-  }
+  return payload;
 }
 
 /**
- * Obtiene el timestamp actual en formato ISO8601 para Firestore
+ * Envía los datos de sensores al endpoint /api/ingest
+ * Usa comandos AT para establecer conexión TCP y enviar HTTP POST
  */
-String getCurrentTimestamp() {
-  time_t now = time(nullptr);
-  struct tm timeinfo;
-  localtime_r(&now, &timeinfo);
+void enviarDatos() {
+  if (!wifiConnected) {
+    Serial.println(F("ERROR: WiFi no conectado, no se pueden enviar datos"));
+    return;
+  }
   
-  char buffer[30];
-  strftime(buffer, sizeof(buffer), "%Y-%m-%dT%H:%M:%S", &timeinfo);
+  Serial.println(F(""));
+  Serial.println(F("========================================"));
+  Serial.println(F("ENVIANDO DATOS AL SERVIDOR"));
+  Serial.println(F("========================================"));
   
-  return String(buffer) + "Z";
+  // ──────────────────────────────────────────────────────────────────────
+  // PASO A: Crear Payload JSON
+  // ──────────────────────────────────────────────────────────────────────
+  Serial.println(F("Creando payload JSON..."));
+  String payload = crearPayloadJSON();
+  
+  Serial.println(F("Payload:"));
+  Serial.println(payload);
+  Serial.print(F("Tamano: "));
+  Serial.print(payload.length());
+  Serial.println(F(" bytes"));
+  
+  // ──────────────────────────────────────────────────────────────────────
+  // PASO B: Construir Petición HTTP
+  // ──────────────────────────────────────────────────────────────────────
+  Serial.println(F(""));
+  Serial.println(F("Construyendo peticion HTTP..."));
+  
+  String httpPacket = "POST ";
+  httpPacket += API_ENDPOINT;
+  httpPacket += " HTTP/1.1\r\n";
+  httpPacket += "Host: ";
+  httpPacket += API_HOST;
+  httpPacket += "\r\n";
+  httpPacket += "Authorization: Bearer ";
+  httpPacket += API_SECRET;
+  httpPacket += "\r\n";
+  httpPacket += "Content-Type: application/json\r\n";
+  httpPacket += "Content-Length: ";
+  httpPacket += String(payload.length());
+  httpPacket += "\r\n";
+  httpPacket += "Connection: close\r\n";
+  httpPacket += "\r\n"; // Separador headers/body
+  httpPacket += payload;
+  httpPacket += "\r\n\r\n";
+  
+  Serial.println(F("HTTP Packet:"));
+  Serial.println(F("----------------------------------------"));
+  Serial.println(httpPacket);
+  Serial.println(F("----------------------------------------"));
+  Serial.print(F("Tamano total: "));
+  Serial.print(httpPacket.length());
+  Serial.println(F(" bytes"));
+  
+  // ──────────────────────────────────────────────────────────────────────
+  // PASO C: Conectar al Servidor (TCP)
+  // ──────────────────────────────────────────────────────────────────────
+  Serial.println(F(""));
+  Serial.println(F("Conectando al servidor..."));
+  
+  String conectCmd = "AT+CIPSTART=\"TCP\",\"";
+  conectCmd += API_HOST;
+  conectCmd += "\",80";
+  
+  if (!sendATCommand(conectCmd, 10000)) {
+    Serial.println(F("ERROR: No se pudo conectar al servidor"));
+    return;
+  }
+  
+  // ──────────────────────────────────────────────────────────────────────
+  // PASO D: Enviar Petición HTTP
+  // ──────────────────────────────────────────────────────────────────────
+  Serial.println(F(""));
+  Serial.println(F("Enviando peticion HTTP..."));
+  
+  // Iniciar modo de envío
+  String cipsendCmd = "AT+CIPSEND=";
+  cipsendCmd += String(httpPacket.length());
+  
+  esp8266.println(cipsendCmd);
+  Serial.print(F("AT CMD: "));
+  Serial.println(cipsendCmd);
+  
+  // Esperar el prompt ">"
+  if (!waitForPrompt(">", 5000)) {
+    Serial.println(F("ERROR: No se recibio prompt de envio"));
+    // Cerrar conexión
+    sendATCommand(F("AT+CIPCLOSE"), 2000);
+    return;
+  }
+  
+  // Enviar el paquete HTTP completo
+  Serial.println(F(""));
+  Serial.println(F("Enviando paquete..."));
+  esp8266.print(httpPacket);
+  
+  // Esperar respuesta del servidor
+  Serial.println(F(""));
+  Serial.println(F("Esperando respuesta del servidor..."));
+  readESP8266Response(5000);
+  
+  // Cerrar conexión
+  Serial.println(F(""));
+  Serial.println(F("Cerrando conexion..."));
+  sendATCommand(F("AT+CIPCLOSE"), 2000);
+  
+  Serial.println(F(""));
+  Serial.println(F("Envio completado!"));
+  Serial.println(F("========================================"));
 }
 
 // ============================================================================
@@ -560,68 +522,63 @@ String getCurrentTimestamp() {
 // ============================================================================
 
 void setup() {
-  // Iniciar comunicación serial
-  Serial.begin(115200);
+  // Iniciar comunicación serial (Monitor Serial)
+  Serial.begin(9600);
   delay(1000);
   
-  Serial.println("\n\n");
-  Serial.println("═════════════════════════════════════════");
-  Serial.println("  SISTEMA DE RIEGO AUTOMATIZADO v3.0");
-  Serial.println("  ESP32/ESP8266 + Firebase Firestore");
-  Serial.println("═════════════════════════════════════════");
-  Serial.println();
+  Serial.println(F(""));
+  Serial.println(F(""));
+  Serial.println(F("========================================"));
+  Serial.println(F("SISTEMA DE RIEGO AUTOMATIZADO"));
+  Serial.println(F("Arduino UNO + ESP-12F (AT Commands)"));
+  Serial.println(F("========================================"));
+  Serial.println(F(""));
+  
+  // Iniciar comunicación con ESP8266
+  Serial.println(F("Iniciando comunicacion con ESP8266..."));
+  esp8266.begin(9600);
+  delay(1000);
   
   // Configurar pines de hardware
-  Serial.println("🔧 Configurando hardware...");
+  Serial.println(F("Configurando hardware..."));
+  
+  // Multiplexores
   pinMode(S0, OUTPUT);
   pinMode(S1, OUTPUT);
   pinMode(S2, OUTPUT);
   pinMode(S3, OUTPUT);
   
+  // Válvulas
   pinMode(VALV1, OUTPUT);
   pinMode(VALV2, OUTPUT);
   pinMode(VALV3, OUTPUT);
   
-  // Inicializar válvulas en estado cerrado
+  // Inicializar válvulas cerradas
   digitalWrite(VALV1, LOW);
   digitalWrite(VALV2, LOW);
   digitalWrite(VALV3, LOW);
   
-  Serial.println("✅ Hardware configurado");
+  Serial.println(F("Hardware configurado!"));
   
-  // Conectar al WiFi
+  // Configurar WiFi
   setupWiFi();
   
   if (!wifiConnected) {
-    Serial.println("❌ ADVERTENCIA: Iniciando sin WiFi");
-    Serial.println("   El sistema funcionará en modo local limitado");
-    return;
+    Serial.println(F(""));
+    Serial.println(F("ADVERTENCIA: Sistema iniciado sin WiFi"));
+    Serial.println(F("Solo funcionara control local de valvulas"));
+    Serial.println(F("Verifique configuracion y reinicie"));
   }
   
-  // Sincronizar hora con NTP
-  setupNTP();
+  Serial.println(F(""));
+  Serial.println(F("========================================"));
+  Serial.println(F("INICIALIZACION COMPLETADA"));
+  Serial.println(F("Sistema operativo"));
+  Serial.println(F("========================================"));
+  Serial.println(F(""));
   
-  // Configurar y autenticar con Firebase
-  setupFirebase();
-  
-  if (!firebaseReady) {
-    Serial.println("❌ ADVERTENCIA: Iniciando sin Firebase");
-    Serial.println("   No se podrán sincronizar datos con la nube");
-    return;
-  }
-  
-  // Obtener configuración inicial desde Firestore
-  fetchConfigFromFirestore();
-  
-  // Obtener estados iniciales de las líneas
-  fetchLineStatesFromFirestore();
-  
-  Serial.println();
-  Serial.println("═════════════════════════════════════════");
-  Serial.println("✅ INICIALIZACIÓN COMPLETADA");
-  Serial.println("🚀 Sistema operativo");
-  Serial.println("═════════════════════════════════════════");
-  Serial.println();
+  // Primera lectura inmediata
+  tiempoAnteriorLectura = millis() - intervaloLectura;
 }
 
 // ============================================================================
@@ -631,64 +588,42 @@ void setup() {
 void loop() {
   unsigned long tiempoActual = millis();
   
-  // ────────────────────────────────────────────────────────────────────────
-  // 1. VERIFICAR CONEXIÓN WiFi (continuo)
-  // ────────────────────────────────────────────────────────────────────────
-  verificarConexionWiFi();
-  
-  // ────────────────────────────────────────────────────────────────────────
-  // 2. SINCRONIZAR CONFIGURACIÓN desde Firestore (cada 5 minutos)
-  // ────────────────────────────────────────────────────────────────────────
-  if (tiempoActual - tiempoAnteriorConfig >= intervaloConfig) {
-    tiempoAnteriorConfig = tiempoActual;
-    fetchConfigFromFirestore();
-  }
-  
-  // ────────────────────────────────────────────────────────────────────────
-  // 3. SINCRONIZAR ESTADOS DE LÍNEAS desde Firestore (cada 30 segundos)
-  // ────────────────────────────────────────────────────────────────────────
-  if (tiempoActual - tiempoAnteriorEstado >= intervaloEstado) {
-    tiempoAnteriorEstado = tiempoActual;
-    fetchLineStatesFromFirestore();
-  }
-  
-  // ────────────────────────────────────────────────────────────────────────
-  // 4. LECTURA DE SENSORES Y CONTROL (según intervaloLectura configurado)
-  // ────────────────────────────────────────────────────────────────────────
+  // Verificar si es tiempo de hacer lectura y envío
   if (tiempoActual - tiempoAnteriorLectura >= intervaloLectura) {
     tiempoAnteriorLectura = tiempoActual;
     
-    Serial.println("\n═════════════════════════════════════════");
-    Serial.println("🔄 CICLO DE LECTURA Y CONTROL");
-    Serial.println("═════════════════════════════════════════");
+    Serial.println(F(""));
+    Serial.println(F(""));
+    Serial.println(F("****************************************"));
+    Serial.println(F("CICLO DE LECTURA Y ENVIO"));
+    Serial.println(F("****************************************"));
     
-    // Leer todos los sensores
+    // 1. Leer todos los sensores
     leerSensores();
     
-    // Enviar lecturas a Firestore
-    if (firebaseReady) {
-      sendReadingsToFirestore();
+    // 2. Enviar datos al servidor (si WiFi está conectado)
+    if (wifiConnected) {
+      enviarDatos();
     } else {
-      Serial.println("⚠️  Firebase no disponible - Lecturas no enviadas");
+      Serial.println(F(""));
+      Serial.println(F("WiFi desconectado - Datos no enviados"));
+      Serial.println(F("Intente reiniciar el sistema"));
     }
     
-    // Controlar válvulas según lecturas y estados remotos
+    // 3. Controlar válvulas basándose en lecturas
     controlarValvulas();
     
-    Serial.println("═════════════════════════════════════════");
-    Serial.printf("⏱️  Próxima lectura en: %.1f minutos\n", intervaloLectura / 60000.0);
-    Serial.println("═════════════════════════════════════════\n");
+    Serial.println(F(""));
+    Serial.println(F("****************************************"));
+    Serial.print(F("Proxima lectura en: "));
+    Serial.print(intervaloLectura / 60000);
+    Serial.println(F(" minutos"));
+    Serial.println(F("****************************************"));
+    Serial.println(F(""));
   }
   
-  // ────────────────────────────────────────────────────────────────────────
-  // 5. MANTENER CONEXIÓN FIREBASE (la librería maneja esto internamente)
-  // ────────────────────────────────────────────────────────────────────────
-  // No se requiere código explícito - Firebase ESP Client maneja
-  // automáticamente la renovación de tokens y reconexiones
-  
-  // Pequeña pausa para evitar saturar el procesador
-  // (no afecta significativamente el rendimiento)
-  delay(10);
+  // Pequeña pausa para no saturar el procesador
+  delay(100);
 }
 
 // ============================================================================
@@ -696,75 +631,68 @@ void loop() {
 // ============================================================================
 
 /*
- * NOTAS DE IMPLEMENTACIÓN Y SEGURIDAD:
+ * NOTAS DE IMPLEMENTACIÓN:
  * 
- * 1. CREDENCIALES:
- *    - Las credenciales están hardcodeadas para simplicidad
- *    - En producción, considerar:
- *      a) Portal cautivo para configuración WiFi
- *      b) Almacenar credenciales en EEPROM/SPIFFS encriptadas
- *      c) Usar Service Account con permisos limitados
- * 
- * 2. REGLAS DE SEGURIDAD FIRESTORE:
- *    - Configurar reglas estrictas en Firebase Console
- *    - El usuario del dispositivo debe tener solo permisos de:
- *      * Lectura: /config/*, /irrigationLines/*
- *      * Escritura: /sensors/*/readings/*
- * 
- * 3. ESTRUCTURA FIRESTORE ESPERADA:
- *    /config/device_config
- *      - thresholdLine1: double
- *      - thresholdLine2: double
- *      - thresholdLine3: double
- *      - readingInterval: integer (milisegundos)
+ * 1. CONEXIONES HARDWARE:
+ *    Arduino -> ESP-12F:
+ *      - Arduino Pin 3 (TX) -> ESP8266 RX (usar divisor de voltaje 5V -> 3.3V)
+ *      - Arduino Pin 2 (RX) -> ESP8266 TX (directo, 3.3V es suficiente)
+ *      - GND común
+ *      - ESP8266 VCC -> 3.3V (usar fuente externa, no del Arduino)
+ *      - ESP8266 CH_PD -> 3.3V (pull-up)
  *    
- *    /irrigationLines/{lineId}
- *      - isActive: boolean
- *      - name: string
+ *    IMPORTANTE: ESP8266 opera a 3.3V, usar divisor de voltaje en TX del Arduino
  *    
- *    /sensors/{sensorId}/readings/{auto-id}
- *      - timestamp: timestamp
- *      - valueVWC: double
- * 
- * 4. INSTALACIÓN DE LIBRERÍAS:
- *    Arduino IDE:
- *      - Tools > Manage Libraries
- *      - Buscar e instalar:
- *        * "Firebase ESP Client" por Mobizt
- *        * "ArduinoJson" por Benoit Blanchon
+ * 2. FIRMWARE ESP8266:
+ *    - Debe tener firmware AT actualizado (versión 1.7+)
+ *    - Verificar con comando: AT+GMR
+ *    - Si no responde, actualizar firmware desde:
+ *      https://www.espressif.com/en/support/download/at
  *    
- *    PlatformIO (platformio.ini):
- *      lib_deps = 
- *        mobizt/Firebase Arduino Client Library for ESP8266 and ESP32
- *        bblanchon/ArduinoJson@^6.21.0
- * 
- * 5. CONFIGURACIÓN DE PLACA:
- *    - Para ESP32:
- *      * Board: "ESP32 Dev Module"
- *      * Upload Speed: 921600
- *      * Flash Frequency: 80MHz
+ * 3. BAUDRATE:
+ *    - Configurado a 9600 para estabilidad con SoftwareSerial
+ *    - Si tu ESP8266 usa otro baudrate, ajustarlo con:
+ *      AT+UART_DEF=9600,8,1,0,0
  *    
- *    - Para ESP8266:
- *      * Cambiar #include <WiFi.h> por #include <ESP8266WiFi.h>
- *      * Ajustar pines ADC (ESP8266 solo tiene A0)
- *      * Board: "NodeMCU 1.0" o similar
+ * 4. CONFIGURACIÓN:
+ *    - Editar config.h con tus credenciales WiFi
+ *    - Configurar API_HOST con tu URL de Vercel
+ *    - Verificar que API_SECRET coincida con el servidor
+ *    
+ * 5. PRUEBAS:
+ *    - Usar Monitor Serial a 9600 baud
+ *    - Verificar respuestas del ESP8266 (AT commands)
+ *    - Para pruebas locales, usar ngrok:
+ *      ngrok http 3000
+ *      Copiar URL a API_HOST en config.h
+ *    
+ * 6. DEBUGGING:
+ *    - El Monitor Serial muestra todos los comandos AT
+ *    - Verificar respuestas "OK" en cada paso
+ *    - Si falla WiFi, verificar SSID/password y cobertura
+ *    - Si falla envío, verificar API_HOST y API_SECRET
+ *    
+ * 7. LIMITACIONES:
+ *    - No usa HTTPS (Arduino UNO no puede manejar SSL)
+ *    - Seguridad se basa en el token de autorización (API_SECRET)
+ *    - SoftwareSerial puede perder datos a altos baudrates
+ *    - Máximo ~1500 bytes por payload (límite de ArduinoJson)
+ *    
+ * 8. OPTIMIZACIONES FUTURAS:
+ *    - Implementar reintentos en caso de falla
+ *    - Guardar lecturas en EEPROM si falla el envío
+ *    - Implementar watchdog timer
+ *    - Agregar LED de estado de conexión
+ *    - Implementar modo de configuración (sin recompilar)
  * 
- * 6. OPTIMIZACIONES FUTURAS:
- *    - Implementar modo deep sleep entre lecturas para ahorro de energía
- *    - Usar listeners de Firestore en lugar de polling para estados isActive
- *    - Implementar OTA (Over-The-Air) updates
- *    - Añadir watchdog timer para auto-reset en caso de cuelgue
- *    - Implementar buffer local en SPIFFS para lecturas cuando no hay conexión
- * 
- * 7. DEBUGGING:
- *    - Monitorear Serial a 115200 baud para ver logs detallados
- *    - Verificar conexión WiFi y señal (RSSI)
- *    - Verificar autenticación Firebase en consola
- *    - Revisar Firebase Console > Firestore para ver datos entrantes
- * 
- * 8. TROUBLESHOOTING COMÚN:
- *    - Error WiFi: Verificar SSID/password, canal WiFi compatible
- *    - Error Firebase Auth: Verificar API Key, email/password de usuario
- *    - Error Firestore: Verificar Project ID, reglas de seguridad
- *    - Timestamps incorrectos: Verificar servidor NTP y zona horaria
+ * 9. CALIBRACIÓN DE SENSORES:
+ *    - La fórmula calcularVWC() está calibrada para sensores capacitivos
+ *    - Ajustar coeficientes según tu modelo de sensor
+ *    - Probar en suelo seco y saturado para validar
+ *    
+ * 10. SEGURIDAD:
+ *     - El token API_SECRET debe mantenerse confidencial
+ *     - WiFi debe usar WPA2/WPA3
+ *     - Cambiar API_SECRET periódicamente
+ *     - No compartir config.h en repositorios públicos
  */

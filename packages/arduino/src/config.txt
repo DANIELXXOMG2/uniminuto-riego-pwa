@@ -1,24 +1,9 @@
-/*
- * Archivo de Configuración - Plantilla para Arduino UNO + ESP-12F
- * 
- * INSTRUCCIONES:
- * 1. Copiar este archivo como "config.h":
- *    cp config.example.h config.h
- * 
- * 2. Editar config.h con tus valores reales
- * 
- * 3. NO subir config.h a Git (ya está en .gitignore)
- * 
- * IMPORTANTE: Este archivo (config.example.h) SÍ se sube a Git como plantilla
- */
-
 #ifndef CONFIG_H
 #define CONFIG_H
 
 // ============================================================================
 // CONFIGURACIÓN WiFi
 // ============================================================================
-// NOTA: ESP8266 solo soporta WiFi 2.4GHz
 #define WIFI_SSID "TU_WIFI_SSID"
 #define WIFI_PASSWORD "TU_WIFI_PASSWORD"
 
@@ -27,15 +12,15 @@
 // ============================================================================
 // Host de tu aplicación en Vercel (sin https://)
 // Ejemplo: "uniminuto-riego-lpljwdoni-danielxxomg2s-projects.vercel.app"
-#define API_HOST "tu-app.vercel.app"
+#define API_HOST "uniminuto-riego-pwa.vercel.app"
 #define API_ENDPOINT "/api/ingest"
 
 // ============================================================================
 // API SECRET (Token de Autenticación)
 // ============================================================================
 // Token generado en Sprint 12 para autenticar el Arduino
-// IMPORTANTE: Mantener este valor seguro y coincidente con Vercel .env
-#define API_SECRET "TU_API_SECRET_AQUI"
+// IMPORTANTE: Mantener este valor seguro
+#define API_SECRET "TWWXPrBLXrG+20SNGY1/xDQXEhoKUl5wmoU2pwfnqnw="
 
 // ============================================================================
 // CONFIGURACIÓN DE LECTURA
@@ -44,37 +29,21 @@
 #define READING_INTERVAL 600000  // 10 minutos = 600000 ms
 
 // ============================================================================
-// NOTAS DE SEGURIDAD Y USO
+// NOTAS DE SEGURIDAD
 // ============================================================================
 /*
-  SEGURIDAD:
-  1. NUNCA subir config.h a repositorios públicos
-  2. El API_SECRET debe coincidir con ARDUINO_API_SECRET en Vercel
+  1. NUNCA subir este archivo a repositorios públicos
+  
+  2. Cambiar el API_SECRET por el generado en tu sistema
+  
   3. Usar WiFi seguro (WPA2/WPA3)
   
-  PRUEBAS LOCALES CON NGROK:
-  1. Iniciar tu servidor Next.js: npm run dev
-  2. En otra terminal: ngrok http 3000
-  3. Usar la URL de ngrok como API_HOST
-     Ejemplo: "1234-56-789-012-345.ngrok-free.app"
+  4. El API_SECRET debe coincidir con el configurado en Vercel (.env)
   
-  PRODUCCIÓN:
-  - Usar la URL de Vercel deployment
-  - Ejemplo: "uniminuto-riego-lpljwdoni-danielxxomg2s-projects.vercel.app"
-  
-  ESTRUCTURA API ENDPOINT:
-  POST /api/ingest
-  Headers:
-    - Authorization: Bearer {API_SECRET}
-    - Content-Type: application/json
-  Body:
-    {
-      "readings": [
-        {"sensorId": "sensor-0", "valueVWC": 45.6},
-        {"sensorId": "sensor-1", "valueVWC": 50.1},
-        ...
-      ]
-    }
+  5. Para pruebas locales, puedes usar ngrok:
+     - Ejecutar: ngrok http 3000
+     - Usar la URL de ngrok como API_HOST
+     - Ejemplo: "1234-56-789-012-345.ngrok-free.app"
 */
 
 #endif // CONFIG_H
