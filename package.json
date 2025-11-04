@@ -15,5 +15,8 @@
   "devDependencies": {
     "knip": "^5.66.1",
     "prettier": "^3.6.2"
+  },
+  "dependencies": {
+    "firebase-admin": "^13.5.0"
   }
 }

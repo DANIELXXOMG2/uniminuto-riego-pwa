@@ -40,6 +40,25 @@ Script interactivo para probar el sistema de notificaciones push.
 5. **Ver tokens FCM** - Lista todos los tokens registrados de usuarios
 6. **Salir**
 
+### 3. `rename-sensors.js` 🔄
+
+Script para renombrar sensores de formato corto a formato con padding (sensor-0 → sensor-000).
+
+**Uso:**
+
+```bash
+cd scripts
+node rename-sensors.js
+```
+
+**Funcionalidades:**
+
+- 🔄 Renombra sensores de `sensor-X` a `sensor-00X` (ej: sensor-0 → sensor-000)
+- 📊 Copia todas las lecturas (subcolección `readings`) al nuevo sensor
+- 🗑️ Elimina los sensores antiguos después de copiar
+- ✅ Procesa múltiples sensores en una sola ejecución
+- 📝 Muestra progreso detallado de cada operación
+
 ---
 
 ## 📁 Scripts Auxiliares (Node.js)

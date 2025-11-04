@@ -21,8 +21,8 @@
 // Reemplazar con tu SSID y contraseña de WiFi
 // NOTA: ESP8266 solo soporta WiFi 2.4GHz
 
-const char* WIFI_SSID = "TU_WIFI_AQUI";
-const char* WIFI_PASSWORD = "TU_PASSWORD_AQUI";
+const char* WIFI_SSID = "STARLINK";
+const char* WIFI_PASSWORD = "";
 
 // ============================================================================
 // CONFIGURACIÓN FIREBASE
@@ -31,17 +31,17 @@ const char* WIFI_PASSWORD = "TU_PASSWORD_AQUI";
 
 // Firebase Host (sin https://)
 // Ejemplo: "mi-proyecto-riego.firebaseio.com"
-const char* FIREBASE_HOST = "tu-proyecto-id.firebaseio.com";
+const char* FIREBASE_HOST = "uniminuto-riego-pwa.firebaseio.com";
 
 // Web API Key
 // Encontrar en: Firebase Console > Project Settings > General > Web API Key
 // Ejemplo: "AIzaSyDxXxXxXxXxXxXxXxXxXxXxXxXxXxXxXxX"
-const char* FIREBASE_API_KEY = "TU_WEB_API_KEY_AQUI";
+const char* FIREBASE_API_KEY = "AIzaSyDn9f-60kTfBPfoGFPDwl7JzhIfYUvA34s";
 
 // Project ID
 // Encontrar en: Firebase Console > Project Settings > General > Project ID
 // Ejemplo: "mi-proyecto-riego"
-const char* FIREBASE_PROJECT_ID = "tu-proyecto-id";
+const char* FIREBASE_PROJECT_ID = "uniminuto-riego-pwa";
 
 // ============================================================================
 // FIREBASE AUTHENTICATION - Usuario del Dispositivo
@@ -57,8 +57,8 @@ const char* FIREBASE_PROJECT_ID = "tu-proyecto-id";
 // 
 // SEGURIDAD: Este usuario debe tener permisos limitados en las reglas de Firestore
 
-const char* USER_EMAIL = "dispositivo@example.com";
-const char* USER_PASSWORD = "password_super_seguro_aqui";
+const char* USER_EMAIL = "dis.ardu@riego.com";
+const char* USER_PASSWORD = "Damian2707#";
 
 // ============================================================================
 // CONFIGURACIÓN NTP (Sincronización de Hora)
