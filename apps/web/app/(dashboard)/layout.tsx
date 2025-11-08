@@ -32,6 +32,7 @@ import { useFCM } from "@/lib/useFCM";
 import { useNotifications, Notification } from "@/lib/useNotifications";
 import { signOut } from "firebase/auth";
 import { auth } from "@/lib/firebase";
+import { ThemeToggle } from "@/components/ui/theme-toggle";
 
 // Tipo para Firestore Timestamp
 interface FirestoreTimestamp {
@@ -356,6 +357,8 @@ export default function DashboardLayout({
 
             {/* Iconos de acción */}
             <div className="flex items-center gap-2">
+              {/* Toggle global de tema */}
+              <ThemeToggle />
               <Popover>
                 <PopoverTrigger asChild>
                   <Button

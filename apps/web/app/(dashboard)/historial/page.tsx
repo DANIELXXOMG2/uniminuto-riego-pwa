@@ -4,7 +4,6 @@ import { useState, useMemo, useEffect } from "react";
 import { ArrowLeft, ChevronLeft, ChevronRight } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
-import { ThemeToggle } from "@/components/ui/theme-toggle";
 import {
   Select,
   SelectContent,
@@ -134,7 +133,6 @@ export default function HistorialPage() {
           </Button>
           <h1 className="text-2xl font-bold">Historial</h1>
         </div>
-        <ThemeToggle />
       </header>
 
       <div className="px-4 pb-6 space-y-6">
