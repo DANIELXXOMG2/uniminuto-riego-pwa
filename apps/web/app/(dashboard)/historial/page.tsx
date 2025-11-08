@@ -4,6 +4,7 @@ import { useState, useMemo, useEffect } from "react";
 import { ArrowLeft, ChevronLeft, ChevronRight } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
+import { ThemeToggle } from "@/components/ui/theme-toggle";
 import {
   Select,
   SelectContent,
@@ -120,18 +121,20 @@ export default function HistorialPage() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-emerald-950 to-emerald-900 text-white">
+    <div className="min-h-screen bg-gradient-to-b from-background to-muted/30 text-foreground">
       {/* Header */}
-      <header className="flex items-center gap-4 p-4">
-        <Button
-          variant="ghost"
-          size="icon"
-          onClick={() => router.back()}
-          className="text-white hover:bg-emerald-800"
-        >
-          <ArrowLeft className="h-6 w-6" />
-        </Button>
-        <h1 className="text-2xl font-bold">Historial</h1>
+      <header className="flex items-center justify-between gap-4 p-4">
+        <div className="flex items-center gap-4">
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => router.back()}
+          >
+            <ArrowLeft className="h-6 w-6" />
+          </Button>
+          <h1 className="text-2xl font-bold">Historial</h1>
+        </div>
+        <ThemeToggle />
       </header>
 
       <div className="px-4 pb-6 space-y-6">
@@ -220,36 +223,24 @@ export default function HistorialPage() {
         )}
 
         {/* Date Range Filters */}
-        <div className="flex gap-2 bg-emerald-900/50 rounded-lg p-1">
+        <div className="flex gap-2 bg-secondary rounded-lg p-1">
           <Button
             variant={selectedRange === "24h" ? "default" : "ghost"}
-            className={`flex-1 ${
-              selectedRange === "24h"
-                ? "bg-emerald-600 hover:bg-emerald-700"
-                : "text-white hover:bg-emerald-800"
-            }`}
+            className={`flex-1`}
             onClick={() => setSelectedRange("24h")}
           >
             24h
           </Button>
           <Button
             variant={selectedRange === "7d" ? "default" : "ghost"}
-            className={`flex-1 ${
-              selectedRange === "7d"
-                ? "bg-emerald-500 hover:bg-emerald-600"
-                : "text-white hover:bg-emerald-800"
-            }`}
+            className={`flex-1`}
             onClick={() => setSelectedRange("7d")}
           >
             7 días
           </Button>
           <Button
             variant={selectedRange === "30d" ? "default" : "ghost"}
-            className={`flex-1 ${
-              selectedRange === "30d"
-                ? "bg-emerald-600 hover:bg-emerald-700"
-                : "text-white hover:bg-emerald-800"
-            }`}
+            className={`flex-1`}
             onClick={() => setSelectedRange("30d")}
           >
             30 días
@@ -286,21 +277,21 @@ export default function HistorialPage() {
             </div>
 
             {/* Chart */}
-            <div className="bg-emerald-900/30 rounded-lg border-2 border-emerald-700/50 p-4">
+            <div className="bg-card rounded-lg border-2 border-border p-4">
               {loading ? (
                 <div className="h-64 flex items-center justify-center">
                   <div className="text-center space-y-2">
-                    <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-emerald-400 mx-auto" />
-                    <p className="text-emerald-300/70">Cargando datos...</p>
+                    <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto" />
+                    <p className="text-muted-foreground">Cargando datos...</p>
                   </div>
                 </div>
               ) : chartData.length === 0 ? (
                 <div className="h-64 flex items-center justify-center">
                   <div className="text-center space-y-2">
-                    <p className="text-emerald-300/70 text-lg">
+                    <p className="text-muted-foreground text-lg">
                       No hay datos disponibles
                     </p>
-                    <p className="text-emerald-400/50 text-sm">
+                    <p className="text-muted-foreground/80 text-sm">
                       No se encontraron lecturas para el rango seleccionado
                     </p>
                   </div>
@@ -310,40 +301,40 @@ export default function HistorialPage() {
                   <LineChart data={chartData}>
                     <CartesianGrid
                       strokeDasharray="3 3"
-                      stroke="rgba(16, 185, 129, 0.1)"
+                      stroke="var(--border)"
                     />
                     <XAxis
                       dataKey="time"
-                      stroke="#6ee7b7"
+                      stroke="var(--muted-foreground)"
                       style={{ fontSize: "12px" }}
-                      tick={{ fill: "#6ee7b7" }}
+                      tick={{ fill: "var(--muted-foreground)" }}
                     />
                     <YAxis
-                      stroke="#6ee7b7"
+                      stroke="var(--muted-foreground)"
                       style={{ fontSize: "12px" }}
-                      tick={{ fill: "#6ee7b7" }}
+                      tick={{ fill: "var(--muted-foreground)" }}
                       domain={[0, 100]}
                       label={{
                         value: "%",
                         position: "insideTopLeft",
-                        fill: "#6ee7b7",
+                        fill: "var(--muted-foreground)",
                       }}
                     />
                     <Tooltip
                       contentStyle={{
-                        backgroundColor: "#064e3b",
-                        border: "1px solid #10b981",
+                        backgroundColor: "var(--popover)",
+                        border: "1px solid var(--ring)",
                         borderRadius: "8px",
-                        color: "#fff",
+                        color: "var(--popover-foreground)",
                       }}
-                      labelStyle={{ color: "#6ee7b7" }}
+                      labelStyle={{ color: "var(--muted-foreground)" }}
                     />
                     <Line
                       type="monotone"
                       dataKey="humidity"
-                      stroke="#10b981"
+                      stroke="var(--chart-2)"
                       strokeWidth={3}
-                      dot={{ fill: "#10b981", r: 4 }}
+                      dot={{ fill: "var(--chart-2)", r: 4 }}
                       activeDot={{ r: 6 }}
                     />
                   </LineChart>
@@ -353,20 +344,20 @@ export default function HistorialPage() {
 
             {/* Summary Metrics */}
             <div className="space-y-3 pt-4">
-              <div className="flex justify-between items-center py-3 border-b border-emerald-700/30">
-                <span className="text-emerald-200">Humedad Promedio</span>
+              <div className="flex justify-between items-center py-3 border-b border-border/50">
+                <span className="text-muted-foreground">Humedad Promedio</span>
                 {loading ? (
-                  <div className="h-7 w-16 bg-emerald-800/30 animate-pulse rounded" />
+                  <div className="h-7 w-16 bg-muted animate-pulse rounded" />
                 ) : (
                   <span className="text-xl font-semibold">
                     {metrics.average}%
                   </span>
                 )}
               </div>
-              <div className="flex justify-between items-center py-3 border-b border-emerald-700/30">
-                <span className="text-emerald-200">Humedad Más Baja</span>
+              <div className="flex justify-between items-center py-3 border-b border-border/50">
+                <span className="text-muted-foreground">Humedad Más Baja</span>
                 {loading ? (
-                  <div className="h-7 w-16 bg-emerald-800/30 animate-pulse rounded" />
+                  <div className="h-7 w-16 bg-muted animate-pulse rounded" />
                 ) : (
                   <span className="text-xl font-semibold">
                     {metrics.lowest}%
@@ -374,9 +365,9 @@ export default function HistorialPage() {
                 )}
               </div>
               <div className="flex justify-between items-center py-3">
-                <span className="text-emerald-200">Humedad Más Alta</span>
+                <span className="text-muted-foreground">Humedad Más Alta</span>
                 {loading ? (
-                  <div className="h-7 w-16 bg-emerald-800/30 animate-pulse rounded" />
+                  <div className="h-7 w-16 bg-muted animate-pulse rounded" />
                 ) : (
                   <span className="text-xl font-semibold">
                     {metrics.highest}%

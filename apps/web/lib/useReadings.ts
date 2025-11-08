@@ -45,6 +45,8 @@ export function useReadings(
         setLoading(true);
         setError(null);
 
+        console.log(`📊 Obteniendo lecturas para sensor: ${sensorId}, rango: ${timeRange}`);
+
         // Calcular la fecha de inicio basada en el timeRange
         const now = new Date();
         let startDate: Date;
@@ -63,31 +65,61 @@ export function useReadings(
             startDate = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
         }
 
+        console.log(`📅 Buscando lecturas desde: ${startDate.toISOString()}`);
+
         // Convertir a Timestamp de Firebase
         const startTimestamp = Timestamp.fromDate(startDate);
 
         // Referencia a la subcolección de readings del sensor
         const readingsRef = collection(db, "sensors", sensorId, "readings");
 
-        // Crear query con filtro de fecha y ordenamiento
+        // Crear query con ordenamiento (sin filtro de fecha por ahora para evitar problemas)
         const q = query(
           readingsRef,
-          where("timestamp", ">=", startTimestamp),
-          orderBy("timestamp", "asc")
+          orderBy("timestamp", "desc")
         );
 
         // Ejecutar la consulta
         const querySnapshot = await getDocs(q);
 
-        // Mapear los documentos a la interfaz Reading
-        const fetchedReadings: Reading[] = querySnapshot.docs.map((doc) => {
-          const data = doc.data();
-          return {
-            timestamp: data.timestamp,
-            valueVWC: data.valueVWC,
-          };
-        });
+        console.log(`📦 Documentos obtenidos: ${querySnapshot.docs.length}`);
 
+        // Mapear los documentos a la interfaz Reading
+        const fetchedReadings: Reading[] = querySnapshot.docs
+          .map((doc) => {
+            const data = doc.data();
+            console.log(`📄 Documento ${doc.id}:`, data);
+            
+            // Manejar diferentes formatos de timestamp
+            let timestamp: Timestamp;
+            if (data.timestamp instanceof Timestamp) {
+              timestamp = data.timestamp;
+              console.log(`✅ Timestamp es instancia de Timestamp`);
+            } else if (data.timestamp?.seconds) {
+              // Si es un objeto con seconds, convertirlo a Timestamp
+              timestamp = new Timestamp(data.timestamp.seconds, data.timestamp.nanoseconds || 0);
+              console.log(`✅ Timestamp convertido desde objeto: ${timestamp.toDate().toISOString()}`);
+            } else {
+              // Fallback: usar timestamp actual
+              console.warn('⚠️ Formato de timestamp no reconocido en documento:', doc.id, data);
+              timestamp = Timestamp.now();
+            }
+            
+            return {
+              timestamp,
+              valueVWC: typeof data.valueVWC === 'number' ? data.valueVWC : 0,
+            };
+          })
+          .filter((reading) => {
+            // Filtrar por fecha en el cliente
+            const readingDate = reading.timestamp.toDate();
+            const isInRange = readingDate >= startDate;
+            console.log(`🔍 Lectura ${readingDate.toISOString()} - En rango: ${isInRange}`);
+            return isInRange;
+          })
+          .sort((a, b) => a.timestamp.seconds - b.timestamp.seconds); // Ordenar ascendente por tiempo
+
+        console.log(`✅ Lecturas filtradas y ordenadas: ${fetchedReadings.length}`);
         setReadings(fetchedReadings);
       } catch (err) {
         console.error("Error fetching readings:", err);
