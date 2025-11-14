@@ -8,11 +8,15 @@
  */
 
 import { setGlobalOptions } from "firebase-functions/v2/options";
-import { onDocumentUpdated } from "firebase-functions/v2/firestore";
+import {
+  onDocumentUpdated,
+  onDocumentWritten,
+} from "firebase-functions/v2/firestore";
 import { onSchedule } from "firebase-functions/v2/scheduler";
 import { onCall, HttpsError } from "firebase-functions/v2/https";
 import * as admin from "firebase-admin";
 import * as logger from "firebase-functions/logger";
+import { FieldValue } from "firebase-admin/firestore";
 
 // Inicializar Firebase Admin SDK
 admin.initializeApp();
@@ -95,6 +99,106 @@ async function cleanInvalidTokens(
   await batch.commit();
   logger.info("Invalid tokens cleaned successfully");
 }
+
+export const aggregateSensorReading = onDocumentWritten(
+  "sensors/{sensorId}/readings/{readingId}",
+  async (event) => {
+    const snap = event.data;
+    if (!snap || !snap.after.exists) {
+      logger.warn("No hay datos posteriores asociados al evento de lectura");
+      return;
+    }
+
+    const data = snap.after.data();
+    if (!data) {
+      logger.warn("Documento de lectura sin payload válido");
+      return;
+    }
+
+    const valueVWC = data.valueVWC;
+    if (typeof valueVWC !== "number" || isNaN(valueVWC)) {
+      logger.log("Lectura sin valor numérico, se omite", data);
+      return;
+    }
+
+    const { sensorId } = event.params;
+    const seconds = data.timestamp?.seconds as number | undefined;
+    const timestamp = seconds ? new Date(seconds * 1000) : new Date();
+    const isoHour = timestamp.toISOString().slice(0, 13);
+    const hourId = isoHour.replace("T", "-");
+    const aggRef = admin
+      .firestore()
+      .doc(`sensors/${sensorId}/readingsHourly/${hourId}`);
+
+    logger.log(
+      `Aggregando lectura de ${sensorId}, hora ${hourId}, valor ${valueVWC}`
+    );
+
+    try {
+      await admin.firestore().runTransaction(async (transaction) => {
+        const aggDoc = await transaction.get(aggRef);
+
+        if (!aggDoc.exists) {
+          transaction.set(aggRef, {
+            hour: hourId,
+            sensorId,
+            sum: valueVWC,
+            count: 1,
+            min: valueVWC,
+            max: valueVWC,
+            avg: valueVWC,
+            updatedAt: FieldValue.serverTimestamp(),
+          });
+          return;
+        }
+
+        const aggData = aggDoc.data();
+        if (!aggData) {
+          transaction.set(
+            aggRef,
+            {
+              hour: hourId,
+              sensorId,
+              sum: valueVWC,
+              count: 1,
+              min: valueVWC,
+              max: valueVWC,
+              avg: valueVWC,
+              updatedAt: FieldValue.serverTimestamp(),
+            },
+            { merge: true }
+          );
+          return;
+        }
+
+        const currentCount =
+          typeof aggData.count === "number" ? aggData.count : 0;
+        const currentSum = typeof aggData.sum === "number" ? aggData.sum : 0;
+        const currentMin =
+          typeof aggData.min === "number" ? aggData.min : valueVWC;
+        const currentMax =
+          typeof aggData.max === "number" ? aggData.max : valueVWC;
+
+        const newCount = currentCount + 1;
+        const newSum = currentSum + valueVWC;
+        const newAvg = newSum / newCount;
+        const newMin = Math.min(currentMin, valueVWC);
+        const newMax = Math.max(currentMax, valueVWC);
+
+        transaction.update(aggRef, {
+          sum: newSum,
+          count: newCount,
+          min: newMin,
+          max: newMax,
+          avg: newAvg,
+          updatedAt: FieldValue.serverTimestamp(),
+        });
+      });
+    } catch (error) {
+      logger.error("Error al actualizar el agregado de lecturas", error);
+    }
+  }
+);
 
 /**
  * 1. FUNCIÓN: Notificar Humedad Baja

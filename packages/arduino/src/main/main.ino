@@ -1,452 +1,218 @@
-/*
-  Sistema de Riego - Versión 1.3 (Wemos D1 R1 - 1 Sensor + Electroválvula)
-  -----------------------------------------------------------------------
-  - Lee UN SOLO sensor de humedad conectado directamente a A0.
-  - Envía la lectura de ese sensor a Firebase Firestore (sensor-000).
-  - Controla UNA electroválvula conectada a un relé en D5.
-  - Lee el estado deseado desde irrigationLines/test-line-1 (campo isActive).
-  - Verifica conexión WiFi y Firebase.
-  - NO usa multiplexores.
-*/
+// Variante 3: 18 Sensores (3 Líneas) + 3 Válvulas
+// - 2 Multiplexores (asumidos compartiendo líneas S0-S3, diferenciados por pin EN)
+// - 18 sensores -> 3 líneas de 6 sensores (linea-1, linea-2, linea-3)
+// - Control individual remoto (isActive) + decisión local por umbral opcional
+// - Actualiza documents de líneas: humidity (promedio) + lastUpdated
+// - Envía lecturas individuales + metadata sensores
+// Ajusta pines EN según tu hardware real.
 
-// ============================================================================
-// LIBRERÍAS
-// ============================================================================
 #include <ESP8266WiFi.h>
 #include <Firebase_ESP_Client.h>
 #include <ArduinoJson.h>
 #include <time.h>
 #include "addons/TokenHelper.h"
 #include "addons/RTDBHelper.h"
+#include "config.h"
 
-// ============================================================================
-// CONFIGURACIÓN
-// ============================================================================
-#include "config.h" // Incluir tu archivo config.h con credenciales
+// Pines multiplexores (compartidos)
+const int S0=4, S1=5, S2=14, S3=13; // D2,D1,D5,D7
+// Pin analógico común
+const int SIG_PIN=A0; // A0
+// Pines enable para cada MUX (LOW = activo) - AJUSTAR según cableado real
+const int MUX1_EN=16; // D0 -> sensores 0-15 (primer mux) *si realmente tienes 16 entradas, usarás sólo las 0-11 y 12-17 parcial
+const int MUX2_EN=0;  // D3 -> sensores adicionales (ej. 12-17) si está en segundo mux
 
-// ============================================================================
-// CONFIGURACIÓN DE HARDWARE - PINES
-// ============================================================================
-const int SENSOR_PIN = A0;    // Pin analógico para el sensor de humedad
-const int VALVULA_PIN = D5;   // Pin digital para controlar el relé de la electroválvula
+// Válvulas
+const int VALV1=15; // D8
+const int VALV2=2;  // D4
+const int VALV3=12; // D6
 
-// ============================================================================
-// VARIABLES GLOBALES
-// ============================================================================
-unsigned long intervaloLectura = 60000;  // Intervalo de lectura de sensor (1 minuto)
-unsigned long intervaloControl = 10000;  // Intervalo de verificación de control (10 segundos)
-float vwc_sensor_test = 0.0;             // Variable para la lectura del sensor
-bool estadoActualValvula = false;        // Estado actual de la válvula
+// (Sprint 16) Configuración de intervalos dinámicos
+unsigned long defaultReadingIntervalMs = 300000; // 5 min (Valor por defecto)
+unsigned long activeIrrigationIntervalMs = 5000;  // 5 seg (Valor por defecto)
+unsigned long currentReadingIntervalMs = defaultReadingIntervalMs; // Intervalo actual en uso
 
-unsigned long tiempoAnteriorLectura = 0;
-unsigned long tiempoAnteriorControl = 0;
+// Intervalo para verificar cambios en la configuración remota
+unsigned long configCheckIntervalMs = 300000; // Re-lee config cada 5 min
+unsigned long lastConfigCheckMs = 0;
 
-FirebaseData fbdo;
-FirebaseData fbdoControl;  // FirebaseData adicional para lectura de control
-FirebaseAuth auth;
-FirebaseConfig config;
-bool wifiConnected = false;
-bool firebaseReady = false;
-unsigned long tiempoReconexionWiFi = 0;
-const unsigned long intervaloReconexionWiFi = 30000;
+// (Sprint 16) Mantener los timers del loop
+unsigned long tLectura = 0;
+unsigned long tControl = 0;
+unsigned long intervaloControl=10000; // El control de válvulas sigue siendo cada 10s
 
-// Path del documento de control en irrigationLines
-const String controlPath = "irrigationLines/test-line-1";
+// Datos sensores
+float vwc[18];
+float promedioLinea[3];
+bool estadoValvula[3] = {false,false,false};
 
-// IDs de sensores - Formato con padding de 3 dígitos (sensor-000 a sensor-017)
+// Umbrales locales (opcional)
+float umbral[3] = {30.0,30.0,30.0};
+
+FirebaseData fbdo; FirebaseData fbdoControl; FirebaseAuth auth; FirebaseConfig config;
+bool wifiConnected=false; bool firebaseReady=false;
+
+const String lineIds[3] = {"linea-1","linea-2","linea-3"};
 const String sensorIds[18] = {
-  "sensor-000", "sensor-001", "sensor-002", "sensor-003", "sensor-004", "sensor-005",
-  "sensor-006", "sensor-007", "sensor-008", "sensor-009", "sensor-010", "sensor-011",
-  "sensor-012", "sensor-013", "sensor-014", "sensor-015", "sensor-016", "sensor-017"
-};
-
-// Configuración de líneas (3 líneas de 6 sensores cada una)
-const String lineIds[3] = { "linea-1", "linea-2", "linea-3" };
-
-// Nombres de sensores (6 sensores por línea, 3 líneas = 18 sensores)
+  "sensor-000","sensor-001","sensor-002","sensor-003","sensor-004","sensor-005",
+  "sensor-006","sensor-007","sensor-008","sensor-009","sensor-010","sensor-011",
+  "sensor-012","sensor-013","sensor-014","sensor-015","sensor-016","sensor-017"};
 const String sensorTitles[18] = {
-  // Línea 1 (sensores 0-5)
-  "Sensor Pasillo 1", "Sensor Pasillo 2", "Sensor Pasillo 3",
-  "Sensor Pasillo 4", "Sensor Pasillo 5", "Sensor Pasillo 6",
-  // Línea 2 (sensores 6-11)
-  "Sensor Área 2-1", "Sensor Área 2-2", "Sensor Área 2-3",
-  "Sensor Área 2-4", "Sensor Área 2-5", "Sensor Área 2-6",
-  // Línea 3 (sensores 12-17)
-  "Sensor Área 3-1", "Sensor Área 3-2", "Sensor Área 3-3",
-  "Sensor Área 3-4", "Sensor Área 3-5", "Sensor Área 3-6"
-};
+  "Sensor Pasillo 1","Sensor Pasillo 2","Sensor Pasillo 3","Sensor Pasillo 4","Sensor Pasillo 5","Sensor Pasillo 6",
+  "Sensor Área 2-1","Sensor Área 2-2","Sensor Área 2-3","Sensor Área 2-4","Sensor Área 2-5","Sensor Área 2-6",
+  "Sensor Área 3-1","Sensor Área 3-2","Sensor Área 3-3","Sensor Área 3-4","Sensor Área 3-5","Sensor Área 3-6"};
 
-// Función para obtener el lineId de un sensor (0-5=linea-1, 6-11=linea-2, 12-17=linea-3)
-String getLineIdForSensor(int sensorIndex) {
-  if (sensorIndex < 6) return lineIds[0];  // linea-1
-  if (sensorIndex < 12) return lineIds[1]; // linea-2
-  return lineIds[2];                        // linea-3
+String lineDocPath(int idx){ return String("irrigationLines/")+lineIds[idx]; }
+
+void setChannel(int ch){ digitalWrite(S0,ch&1); digitalWrite(S1,(ch>>1)&1); digitalWrite(S2,(ch>>2)&1); digitalWrite(S3,(ch>>3)&1); }
+float calcularVWC(int r){ float V=-0.000049*pow(r,2)-0.0016*r+47.9; if(V<0)V=0; if(V>100)V=100; return V; }
+
+void enableMux(int mux){
+  // mux 0 -> activar MUX1_EN, desactivar MUX2_EN
+  if(mux==0){ digitalWrite(MUX1_EN, LOW); digitalWrite(MUX2_EN, HIGH); }
+  else { digitalWrite(MUX1_EN, HIGH); digitalWrite(MUX2_EN, LOW); }
 }
 
-// ============================================================================
-// FUNCIONES DE HARDWARE
-// ============================================================================
-float calcularVWC(int lectura) {
-  float VWC = -0.000049 * pow(lectura, 2) - 0.0016 * lectura + 47.9;
-  if (VWC < 0) VWC = 0; if (VWC > 100) VWC = 100;
-  return VWC;
-}
+void setupWiFi(){ WiFi.mode(WIFI_STA); WiFi.begin(WIFI_SSID,WIFI_PASSWORD); for(int i=0;i<40 && WiFi.status()!=WL_CONNECTED;i++){ delay(250);} wifiConnected=WiFi.status()==WL_CONNECTED; }
+void setupFirebase(){ config.api_key=FIREBASE_API_KEY; config.database_url=FIREBASE_HOST; auth.user.email=USER_EMAIL; auth.user.password=USER_PASSWORD; config.token_status_callback=tokenStatusCallback; Firebase.reconnectWiFi(true); Firebase.begin(&config,&auth); for(int i=0;i<40 && !Firebase.ready(); i++){ delay(250);} firebaseReady=Firebase.ready(); }
+bool verificarFirebase(){ if(!wifiConnected) return false; if(!Firebase.ready()){ firebaseReady=false; return false;} firebaseReady=true; return true; }
 
-void leerSensores() {
-  int lectura = analogRead(SENSOR_PIN);
-  vwc_sensor_test = calcularVWC(lectura);
-  Serial.println("─────────────────────────────────────────");
-  Serial.println("📊 LECTURA SENSOR DE PRUEBA");
-  Serial.printf("Sensor en A0: %d -> %.2f%%\n", lectura, vwc_sensor_test);
-}
+void fetchSystemConfig(){
+  if(!verificarFirebase()) return;
 
-// Función para actualizar el estado de la electroválvula
-void actualizarEstadoValvula(bool encender) {
-  if (encender && !estadoActualValvula) {
-    Serial.println("   ⚡️ ENCENDIENDO VÁLVULA (Relé Pin LOW)");
-    digitalWrite(VALVULA_PIN, LOW);  // Relé se activa con LOW
-    estadoActualValvula = true;
-  } else if (!encender && estadoActualValvula) {
-    Serial.println("   🛑 APAGANDO VÁLVULA (Relé Pin HIGH)");
-    digitalWrite(VALVULA_PIN, HIGH);  // Relé se desactiva con HIGH
-    estadoActualValvula = false;
-  }
-  // Si el estado deseado es igual al actual, no hacer nada
-}
+  Serial.println(F("🔄 Leyendo system/config desde Firestore..."));
+  String docPath = "system/config";
 
-// ============================================================================
-// FUNCIONES DE CONECTIVIDAD - WiFi
-// ============================================================================
-void setupWiFi() {
-  Serial.println("─────────────────────────────────────────");
-  Serial.println("📡 INICIANDO CONEXIÓN WiFi (ESP8266)");
-  Serial.printf("SSID: %s\n", WIFI_SSID);
-  WiFi.mode(WIFI_STA);
-  WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
-  int intentos = 0;
-  while (WiFi.status() != WL_CONNECTED && intentos < 20) {
-    delay(500); Serial.print("."); intentos++;
-  }
-  if (WiFi.status() == WL_CONNECTED) {
-    wifiConnected = true;
-    Serial.println("\n✅ WiFi conectado exitosamente");
-    Serial.print("📶 IP asignada: "); Serial.println(WiFi.localIP());
-    Serial.print("📊 Intensidad de señal: "); Serial.print(WiFi.RSSI()); Serial.println(" dBm");
-  } else {
-    wifiConnected = false;
-    Serial.println("\n❌ Error: No se pudo conectar al WiFi");
-    Serial.println("⚠️  Verifique las credenciales y la disponibilidad de la red");
-  }
-}
+  if(Firebase.Firestore.getDocument(&fbdo, FIREBASE_PROJECT_ID, "", docPath.c_str())){
+    StaticJsonDocument<512> doc;
+    DeserializationError err = deserializeJson(doc, fbdo.payload());
+    if(err){
+      Serial.print(F("❌ Error parseando system/config: "));
+      Serial.println(err.c_str());
+      return;
+    }
 
-void verificarConexionWiFi() {
-  unsigned long tiempoActual = millis();
-  if (WiFi.status() != WL_CONNECTED) {
-    wifiConnected = false;
-    if (tiempoActual - tiempoReconexionWiFi >= intervaloReconexionWiFi) {
-      tiempoReconexionWiFi = tiempoActual;
-      Serial.println("⚠️  WiFi desconectado. Intentando reconectar...");
-      setupWiFi(); // Reintentar conexión
+    long defaultSec = doc["fields"]["defaultReadingIntervalSeconds"]["integerValue"] | 0;
+    long activeSec = doc["fields"]["activeIrrigationIntervalSeconds"]["integerValue"] | 0;
+
+    if(defaultSec > 0){
+      defaultReadingIntervalMs = (unsigned long)defaultSec * 1000UL;
+      Serial.print(F("✅ Intervalo Reposo (Default) actualizado: "));
+      Serial.println(defaultSec);
+    }
+    if(activeSec > 0){
+      activeIrrigationIntervalMs = (unsigned long)activeSec * 1000UL;
+      Serial.print(F("✅ Intervalo Activo actualizado: "));
+      Serial.println(activeSec);
     }
   } else {
-    if (!wifiConnected) { // Si estaba desconectado pero ahora conecta
-      wifiConnected = true;
-      Serial.println("✅ WiFi reconectado");
-      // Podrías forzar una resincronización con Firebase aquí si fuera necesario
-      // setupFirebase(); // Ojo: Llamar setupFirebase de nuevo puede ser problemático
+    Serial.print(F("❌ Error leyendo system/config: "));
+    Serial.println(fbdo.errorReason());
+  }
+}
+
+void leerSensores(){
+  Serial.println("📊 Leyendo 18 sensores (3 líneas)");
+  for(int linea=0; linea<3; linea++){
+    float suma=0;
+    for(int offset=0; offset<6; offset++){
+      int sensorGlobal = linea*6 + offset; // 0..17
+      int muxIndex = (sensorGlobal < 12) ? 0 : 1; // asumiendo que los 12 primeros en MUX1 y ultimos 6 en MUX2
+      int canal = (sensorGlobal < 12) ? sensorGlobal : (sensorGlobal - 12); // canal relativo 0..11 ó 0..5
+      enableMux(muxIndex);
+      setChannel(canal); delayMicroseconds(120);
+      int raw = analogRead(SIG_PIN);
+      vwc[sensorGlobal] = calcularVWC(raw);
+      suma += vwc[sensorGlobal];
+      Serial.printf("  L%d S%03d (mux%d ch%d): %d -> %.2f%%\n", linea+1, sensorGlobal, muxIndex, canal, raw, vwc[sensorGlobal]);
     }
+    promedioLinea[linea] = suma / 6.0;
+    Serial.printf("  >> Promedio linea-%d: %.2f%% (umbral %.1f)\n", linea+1, promedioLinea[linea], umbral[linea]);
   }
 }
 
-// ============================================================================
-// FUNCIONES DE FIREBASE - AUTENTICACIÓN Y CONFIGURACIÓN
-// ============================================================================
-void setupFirebase() {
-  Serial.println("─────────────────────────────────────────");
-  Serial.println("🔥 CONFIGURANDO FIREBASE");
-
-  config.api_key = FIREBASE_API_KEY;
-  auth.user.email = USER_EMAIL;
-  auth.user.password = USER_PASSWORD;
-  config.database_url = FIREBASE_HOST;
-  config.token_status_callback = tokenStatusCallback; // Función de TokenHelper.h
-
-  Firebase.reconnectWiFi(true);
-  Firebase.begin(&config, &auth);
-
-  Serial.println("⏳ Autenticando con Firebase...");
-  int intentos = 0;
-  while (!Firebase.ready() && intentos < 20) { // Firebase.ready() verifica la autenticación
-    delay(500); Serial.print("."); intentos++;
-  }
-
-  if (Firebase.ready()) {
-    firebaseReady = true;
-    Serial.println("\n✅ Firebase autenticado exitosamente");
-    Serial.printf("👤 Usuario: %s\n", USER_EMAIL);
-  } else {
-    firebaseReady = false;
-    Serial.println("\n❌ Error: No se pudo autenticar con Firebase");
-    Serial.println("⚠️  Verifique las credenciales y la configuración del proyecto");
-    Serial.printf("   Error: %s\n", fbdo.errorReason().c_str()); // Mostrar razón del error
-  }
+void actualizarEstadoValvula(int linea, bool on){
+  int pin = (linea==0?VALV1:(linea==1?VALV2:VALV3));
+  if(on && !estadoValvula[linea]){ digitalWrite(pin, LOW); estadoValvula[linea]=true; Serial.printf("⚡️ Válvula L%d ON\n", linea+1); }
+  else if(!on && estadoValvula[linea]){ digitalWrite(pin, HIGH); estadoValvula[linea]=false; Serial.printf("🛑 Válvula L%d OFF\n", linea+1); }
 }
 
-// *** FUNCIÓN CORREGIDA ***
-bool verificarFirebase() {
-  if (!wifiConnected) {
-    return false; // No hay WiFi, imposible verificar Firebase
-  }
+void leerControlLineas(){
+  if(!verificarFirebase()) return;
 
-  if (!Firebase.ready()) {
-    firebaseReady = false;
-    Serial.println("⚠️  Firebase no está listo. Token podría haber expirado o reconectando...");
-    // La librería intenta manejar la renovación automáticamente.
-    // Si falla repetidamente, puede haber un problema de credenciales o red.
-    return false; // <<< --- RETORNO FALTANTE AÑADIDO --- <<<
-  } else {
-    // Si estaba marcado como no listo pero ahora sí lo está
-    if (!firebaseReady) {
-        Serial.println("✅ Firebase reconectado/listo.");
-    }
-    firebaseReady = true;
-    return true;
-  }
-}
-
-// ============================================================================
-// FUNCIONES DE FIREBASE - ENVÍO DE DATOS
-// ============================================================================
-void sendReadingsToFirestore() {
-  if (!verificarFirebase()) {
-    Serial.println("⚠️  No se puede enviar lecturas: Firebase no está listo");
-    return;
-  }
-
-  Serial.println("─────────────────────────────────────────");
-  Serial.println("📤 ENVIANDO LECTURA A FIRESTORE");
-
-  time_t now = time(nullptr); // Obtener timestamp actual (requiere NTP)
-  
-  // Solo enviamos para sensor-000 en esta versión de prueba
-  int sensorIndex = 0;
-  String sensorId = sensorIds[sensorIndex];
-  String lineId = getLineIdForSensor(sensorIndex);
-  String title = sensorTitles[sensorIndex];
-
-  // 1. Actualizar/crear el documento del sensor con metadata
-  String sensorDocPath = "sensors/" + sensorId;
-  
-  FirebaseJson sensorDoc;
-  sensorDoc.set("fields/lineId/stringValue", lineId);
-  sensorDoc.set("fields/status/stringValue", "active");
-  sensorDoc.set("fields/title/stringValue", title);
-  
-  Serial.printf("📝 Actualizando documento sensor: %s\n", sensorId.c_str());
-  Serial.printf("   - lineId: %s\n", lineId.c_str());
-  Serial.printf("   - status: active\n");
-  Serial.printf("   - title: %s\n", title.c_str());
-  
-  // Usar patchDocument para actualizar solo estos campos sin borrar otros
-  if (Firebase.Firestore.patchDocument(&fbdo, FIREBASE_PROJECT_ID, "",
-                                       sensorDocPath.c_str(), sensorDoc.raw(),
-                                       "lineId,status,title")) {
-    Serial.printf("  ✅ Documento %s actualizado\n", sensorId.c_str());
-  } else {
-    Serial.printf("  ⚠️  Error al actualizar documento: %s\n", fbdo.errorReason().c_str());
-    // Intentar crear el documento si no existe
-    if (Firebase.Firestore.createDocument(&fbdo, FIREBASE_PROJECT_ID, "",
-                                          sensorDocPath.c_str(), sensorDoc.raw())) {
-      Serial.printf("  ✅ Documento %s creado\n", sensorId.c_str());
-    } else {
-      Serial.printf("  ❌ Error al crear documento: %s\n", fbdo.errorReason().c_str());
+  for(int l=0;l<3;l++){
+    String path=lineDocPath(l);
+    if(Firebase.Firestore.getDocument(&fbdoControl,FIREBASE_PROJECT_ID,"",path.c_str())){
+      FirebaseJson js; js.setJsonData(fbdoControl.payload()); FirebaseJsonData r;
+      if(js.get(r,"fields/isActive/booleanValue")){
+        bool remoto=r.boolValue; // remoto domina; se puede combinar con umbral según demanda
+        bool activar = remoto && (promedioLinea[l] < umbral[l]);
+        actualizarEstadoValvula(l, activar);
+      }
     }
   }
 
-  // 2. Crear la lectura en la subcolección readings
-  String collectionPath = sensorDocPath + "/readings";
-  
-  FirebaseJson content;
-  content.set("fields/timestamp/mapValue/fields/seconds/integerValue", String(now));
-  content.set("fields/valueVWC/doubleValue", vwc_sensor_test);
-
-  Serial.printf("📊 Creando lectura: %.2f%% VWC\n", vwc_sensor_test);
-  
-  if (Firebase.Firestore.createDocument(&fbdo, FIREBASE_PROJECT_ID, "",
-                                        collectionPath.c_str(), content.raw())) {
-    Serial.printf("  ✅ Lectura enviada exitosamente\n");
-  } else {
-    Serial.printf("  ❌ Error al enviar lectura: %s\n", fbdo.errorReason().c_str());
-  }
-}
-
-// ============================================================================
-// FUNCIONES DE FIREBASE - LECTURA DE CONTROL (isActive)
-// ============================================================================
-void leerEstadoValvulaFirebase() {
-  if (!verificarFirebase()) {
-    Serial.println("⚠️  No se puede leer control: Firebase no está listo");
-    return;
-  }
-
-  Serial.println("─────────────────────────────────────────");
-  Serial.println("📥 LEYENDO ESTADO DE VÁLVULA (irrigationLines)");
-  Serial.printf("   Documento: %s\n", controlPath.c_str());
-
-  // Obtener el documento de control
-  if (Firebase.Firestore.getDocument(&fbdoControl, FIREBASE_PROJECT_ID, "", 
-                                     controlPath.c_str())) {
-    Serial.printf("   Documento recibido. Payload: %s\n", fbdoControl.payload().c_str());
-
-    // Parsear el JSON recibido
-    FirebaseJson js;
-    js.setJsonData(fbdoControl.payload());
-    FirebaseJsonData result;
-
-    // Buscar el campo 'isActive' de tipo booleano
-    if (js.get(result, "fields/isActive/booleanValue")) {
-      bool estadoDeseado = result.boolValue;
-      Serial.printf("   Estado deseado (isActive): %s\n", 
-                    estadoDeseado ? "true (ENCENDER)" : "false (APAGAR)");
-
-      // Actualizar el estado de la válvula
-      actualizarEstadoValvula(estadoDeseado);
-
-    } else {
-      Serial.println("   ⚠️  No se encontró el campo 'isActive' en el documento");
-      // Por seguridad, apagar la válvula si no se puede leer el estado
-      actualizarEstadoValvula(false);
+  // (Sprint 16) Selección dinámica del intervalo de lectura según estado de válvulas
+  bool anyValveActive = estadoValvula[0] || estadoValvula[1] || estadoValvula[2];
+  if(anyValveActive){
+    if(currentReadingIntervalMs != activeIrrigationIntervalMs){
+      Serial.println(F("💧 RIEGO ACTIVO. Cambiando a intervalo rápido (5s)."));
+      currentReadingIntervalMs = activeIrrigationIntervalMs;
+      tLectura = millis(); // Forzar actualización inmediata
     }
   } else {
-    Serial.printf("   ❌ Error al leer documento: %s\n", 
-                  fbdoControl.errorReason().c_str());
-    // Por seguridad, apagar la válvula si hay error
-    actualizarEstadoValvula(false);
-  }
-}
-
-// ============================================================================
-// FUNCIONES DE UTILIDAD - NTP Y TIEMPO
-// ============================================================================
-void setupNTP() {
-  Serial.println("─────────────────────────────────────────");
-  Serial.println("🕐 SINCRONIZANDO HORA CON NTP");
-
-  // Configurar NTP (asegúrate que GMT_OFFSET_SEC, etc. estén en config.h)
-  configTime(GMT_OFFSET_SEC, DAYLIGHT_OFFSET_SEC, NTP_SERVER);
-
-  Serial.print("⏳ Esperando sincronización NTP");
-  time_t now = time(nullptr);
-  int intentos = 0;
-  // Esperar hasta que el tiempo sea válido (mayor que un timestamp de inicio conocido)
-  while (now < 1000000000 && intentos < 20) { // Espera hasta aprox. 2001
-    delay(500); Serial.print("."); now = time(nullptr); intentos++;
-  }
-
-  if (now >= 1000000000) {
-    Serial.println("\n✅ Hora sincronizada exitosamente");
-    struct tm timeinfo;
-    localtime_r(&now, &timeinfo);
-    Serial.print("📅 Fecha y hora actual: ");
-    Serial.print(asctime(&timeinfo)); // Imprime la fecha y hora formateada
-  } else {
-    Serial.println("\n⚠️  Advertencia: No se pudo sincronizar la hora con NTP");
-    Serial.println("⚠️  Los timestamps podrían ser incorrectos");
-  }
-}
-
-// ============================================================================
-// SETUP - INICIALIZACIÓN DEL SISTEMA
-// ============================================================================
-void setup() {
-  Serial.begin(115200);
-  delay(1000);
-  Serial.println("\n\n");
-  Serial.println("═════════════════════════════════════════");
-  Serial.println("  SISTEMA DE RIEGO - V1.3");
-  Serial.println("  1 Sensor + Electroválvula Controlada");
-  Serial.println("  Wemos D1 R1 + Firebase Firestore");
-  Serial.println("═════════════════════════════════════════");
-  Serial.println();
-
-  Serial.println("🔧 Configurando hardware...");
-  pinMode(SENSOR_PIN, INPUT);           // Configurar pin del sensor
-  pinMode(VALVULA_PIN, OUTPUT);         // Configurar pin de la válvula
-  digitalWrite(VALVULA_PIN, HIGH);      // Iniciar con válvula apagada (relé HIGH = OFF)
-  estadoActualValvula = false;
-  Serial.println("✅ Hardware configurado (Sensor + Válvula)");
-
-  setupWiFi();
-  if (!wifiConnected) { 
-    Serial.println("❌ ADVERTENCIA: Iniciando sin WiFi. Deteniendo."); 
-    while(1) delay(1000); 
-  }
-
-  setupNTP();
-
-  setupFirebase();
-  if (!firebaseReady) { 
-    Serial.println("❌ ADVERTENCIA: Iniciando sin Firebase. Deteniendo."); 
-    while(1) delay(1000); 
-  }
-
-  Serial.println();
-  Serial.println("═════════════════════════════════════════");
-  Serial.println("✅ INICIALIZACIÓN COMPLETADA");
-  Serial.println("🚀 Sistema operativo");
-  Serial.println("   - Leyendo sensor cada 60 seg");
-  Serial.println("   - Verificando control cada 10 seg");
-  Serial.println("═════════════════════════════════════════");
-  Serial.println();
-}
-
-// ============================================================================
-// LOOP PRINCIPAL
-// ============================================================================
-void loop() {
-  unsigned long tiempoActual = millis();
-
-  verificarConexionWiFi(); // Verificar y reconectar WiFi si es necesario
-
-  // --- CICLO DE LECTURA Y ENVÍO DE SENSOR ---
-  if (tiempoActual - tiempoAnteriorLectura >= intervaloLectura) {
-    tiempoAnteriorLectura = tiempoActual;
-
-    Serial.println("\n═════════════════════════════════════════");
-    Serial.println("🔄 CICLO DE LECTURA SENSOR");
-    Serial.println("═════════════════════════════════════════");
-
-    leerSensores(); // Leer el sensor
-
-    if (wifiConnected && firebaseReady) {
-      sendReadingsToFirestore(); // Enviar la lectura a Firestore
-    } else {
-      Serial.println("⚠️  WiFi o Firebase no disponible - Lectura no enviada");
+    if(currentReadingIntervalMs != defaultReadingIntervalMs){
+      Serial.println(F("☀️ RIEGO DETENIDO. Cambiando a intervalo normal (5min)."));
+      currentReadingIntervalMs = defaultReadingIntervalMs;
     }
+  }
+}
 
-    Serial.println("═════════════════════════════════════════");
-    Serial.printf("⏱️  Próxima lectura en: %.1f segundos\n", intervaloLectura / 1000.0);
-    Serial.println("═════════════════════════════════════════\n");
+void patchSensorMeta(int idx){ String doc="sensors/"+sensorIds[idx]; FirebaseJson meta; meta.set("fields/lineId/stringValue", lineIds[idx/6]); meta.set("fields/status/stringValue","active"); meta.set("fields/title/stringValue", sensorTitles[idx]); if(!Firebase.Firestore.patchDocument(&fbdo,FIREBASE_PROJECT_ID,"",doc.c_str(),meta.raw(),"lineId,status,title")){ Firebase.Firestore.createDocument(&fbdo,FIREBASE_PROJECT_ID,"",doc.c_str(),meta.raw()); } }
+
+void actualizarLineasFirestore(){ if(!verificarFirebase()) return; time_t now=time(nullptr); for(int l=0;l<3;l++){ String path=lineDocPath(l); FirebaseJson line; line.set("fields/humidity/doubleValue", promedioLinea[l]); line.set("fields/title/stringValue", String("Línea ")+ (l+1)); line.set("fields/lastUpdated/timestampValue", String((long long)now*1000)); if(!Firebase.Firestore.patchDocument(&fbdo,FIREBASE_PROJECT_ID,"",path.c_str(),line.raw(),"humidity,title,lastUpdated")){ Firebase.Firestore.createDocument(&fbdo,FIREBASE_PROJECT_ID,"",path.c_str(),line.raw()); } }}
+
+void enviarLecturas(){ if(!verificarFirebase()) return; time_t now=time(nullptr);
+  const long RAW_DATA_TTL_SECONDS = 5L * 24L * 60L * 60L; // (Sprint 17) TTL de 5 días para lecturas crudas
+  for(int i=0;i<18;i++){
+    patchSensorMeta(i);
+    String readings="sensors/"+sensorIds[i]+"/readings";
+    FirebaseJson c;
+    c.set("fields/timestamp/mapValue/fields/seconds/integerValue", String(now));
+    c.set("fields/valueVWC/doubleValue", vwc[i]);
+    time_t expireAtTimestamp = now + RAW_DATA_TTL_SECONDS;
+    c.set("fields/expireAt/mapValue/fields/seconds/integerValue", String(expireAtTimestamp));
+    Firebase.Firestore.createDocument(&fbdo,FIREBASE_PROJECT_ID,"",readings.c_str(),c.raw());
+    delay(20);
+  }
+}
+
+void setup(){ Serial.begin(115200); delay(400); Serial.println("== Variante: 18 Sensores / 3 Válvulas ==");
+  pinMode(S0,OUTPUT); pinMode(S1,OUTPUT); pinMode(S2,OUTPUT); pinMode(S3,OUTPUT); pinMode(SIG_PIN,INPUT);
+  pinMode(MUX1_EN,OUTPUT); pinMode(MUX2_EN,OUTPUT); digitalWrite(MUX1_EN,HIGH); digitalWrite(MUX2_EN,HIGH);
+  pinMode(VALV1,OUTPUT); pinMode(VALV2,OUTPUT); pinMode(VALV3,OUTPUT); digitalWrite(VALV1,HIGH); digitalWrite(VALV2,HIGH); digitalWrite(VALV3,HIGH);
+  configTime(GMT_OFFSET_SEC, DAYLIGHT_OFFSET_SEC, NTP_SERVER); setupWiFi(); if(!wifiConnected){ while(1) delay(1000);} setupFirebase(); if(!firebaseReady){ while(1) delay(1000);} fetchSystemConfig(); }
+
+void loop(){
+  unsigned long ms=millis();
+
+  // (Sprint 16) Verificar configuración remota periódicamente
+  if(ms - lastConfigCheckMs >= configCheckIntervalMs){
+    lastConfigCheckMs = ms;
+    fetchSystemConfig();
   }
 
-  // --- CICLO DE VERIFICACIÓN DE CONTROL DE VÁLVULA ---
-  if (tiempoActual - tiempoAnteriorControl >= intervaloControl) {
-    tiempoAnteriorControl = tiempoActual;
-
-    Serial.println("\n═════════════════════════════════════════");
-    Serial.println("🔄 CICLO DE CONTROL VÁLVULA");
-    Serial.println("═════════════════════════════════════════");
-
-    if (wifiConnected && verificarFirebase()) {
-      leerEstadoValvulaFirebase(); // Leer y aplicar estado desde Firebase
-    } else {
-      Serial.println("⚠️  WiFi/Firebase no disponible - No se puede verificar control");
-    }
-
-    Serial.println("═════════════════════════════════════════");
-    Serial.printf("⏱️  Próxima verificación en: %.1f segundos\n", intervaloControl / 1000.0);
-    Serial.println("═════════════════════════════════════════\n");
+  if(ms - tLectura >= currentReadingIntervalMs){
+    tLectura=ms;
+    leerSensores();
+    actualizarLineasFirestore();
+    enviarLecturas();
   }
 
-  delay(10); // Pequeña pausa para estabilidad
+  if(ms - tControl >= intervaloControl){
+    tControl=ms;
+    leerControlLineas();
+  }
+
+  delay(10);
 }
