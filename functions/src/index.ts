@@ -42,6 +42,13 @@ interface IrrigationLine {
   humidity: number;
 }
 
+interface SensorReading {
+  valueVWC?: number;
+  timestamp?: {
+    seconds?: number;
+  };
+}
+
 /**
  * Obtener todos los tokens FCM de usuarios administradores
  */
@@ -109,11 +116,7 @@ export const aggregateSensorReading = onDocumentWritten(
       return;
     }
 
-    const data = snap.after.data();
-    if (!data) {
-      logger.warn("Documento de lectura sin payload válido");
-      return;
-    }
+    const data: SensorReading = snap.after.data();
 
     const valueVWC = data.valueVWC;
     if (typeof valueVWC !== "number" || isNaN(valueVWC)) {
@@ -122,7 +125,7 @@ export const aggregateSensorReading = onDocumentWritten(
     }
 
     const { sensorId } = event.params;
-    const seconds = data.timestamp?.seconds as number | undefined;
+    const seconds = data.timestamp?.seconds;
     const timestamp = seconds ? new Date(seconds * 1000) : new Date();
     const isoHour = timestamp.toISOString().slice(0, 13);
     const hourId = isoHour.replace("T", "-");
