@@ -49,6 +49,19 @@ function requireArg(obj, key, help) {
   }
 }
 
+async function initializeSystemConfig(db) {
+  const configRef = db.collection('system').doc('config');
+  const configPayload = {
+    defaultReadingIntervalSeconds: 300,
+    activeIrrigationIntervalSeconds: 5,
+    irrigationMoistureThreshold: 40,
+    autoIrrigationEnabled: false,
+    updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+  };
+
+  await configRef.set(configPayload, { merge: true });
+}
+
 (async function main() {
   console.log('═══════════════════════════════════════════════════════');
   console.log(' Init irrigationLines document');
@@ -88,6 +101,7 @@ function requireArg(obj, key, help) {
   const db = admin.firestore();
 
   try {
+    await initializeSystemConfig(db);
     const ref = db.collection('irrigationLines').doc(id);
     const snap = await ref.get();
 
