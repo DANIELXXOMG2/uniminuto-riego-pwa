@@ -79,4 +79,3 @@ if (process.env.NODE_ENV === 'development' && process.env.NEXT_PUBLIC_USE_EMULAT
   }
 }
 
-export default app;

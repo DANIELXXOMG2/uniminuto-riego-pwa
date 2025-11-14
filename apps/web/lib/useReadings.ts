@@ -4,7 +4,6 @@ import { useState, useEffect } from "react";
 import {
   collection,
   query,
-  where,
   getDocs,
   Timestamp,
   orderBy,
@@ -66,9 +65,6 @@ export function useReadings(
         }
 
         console.log(`📅 Buscando lecturas desde: ${startDate.toISOString()}`);
-
-        // Convertir a Timestamp de Firebase
-        const startTimestamp = Timestamp.fromDate(startDate);
 
         // Referencia a la subcolección de readings del sensor
         const readingsRef = collection(db, "sensors", sensorId, "readings");
