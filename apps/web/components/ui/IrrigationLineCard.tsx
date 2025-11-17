@@ -34,7 +34,6 @@ export default function IrrigationLineCard({
 
   // Determinar modo: automático o manual
   const isAutoMode = autoIrrigationEnabled && targetHumidity > 0;
-  const isManualMode = !isAutoMode;
 
   // Calcular estado de riego automático
   const needsWater = isAutoMode && humidity < targetHumidity;
@@ -80,9 +79,9 @@ export default function IrrigationLineCard({
               <div className="flex items-center gap-2">
                 <h3 className="font-semibold text-gray-900">{title}</h3>
                 {isAutoMode ? (
-                  <Zap className="w-4 h-4 text-green-600" title="Riego Automático" />
+                  <Zap className="w-4 h-4 text-green-600" />
                 ) : (
-                  <Hand className="w-4 h-4 text-gray-500" title="Control Manual" />
+                  <Hand className="w-4 h-4 text-gray-500" />
                 )}
               </div>
               <div className="flex items-center gap-1.5 mt-0.5">
