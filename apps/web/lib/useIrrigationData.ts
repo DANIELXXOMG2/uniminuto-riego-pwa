@@ -10,6 +10,7 @@ export interface IrrigationLine {
   title: string;
   isActive: boolean;
   humidity: number;
+  targetHumidity?: number; // Umbral objetivo (0-60%)
 }
 
 // Interfaz del resultado del hook
@@ -17,6 +18,7 @@ interface UseIrrigationDataResult {
   lines: IrrigationLine[];
   loading: boolean;
   error: string | null;
+  fromCache: boolean;
 }
 
 /**
@@ -27,6 +29,7 @@ export function useIrrigationData(): UseIrrigationDataResult {
   const [lines, setLines] = useState<IrrigationLine[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [fromCache, setFromCache] = useState<boolean>(false);
 
   useEffect(() => {
     // Referencia a la colección de irrigationLines
@@ -34,7 +37,9 @@ export function useIrrigationData(): UseIrrigationDataResult {
 
     // Configurar el listener de Firestore
     const unsubscribe = onSnapshot(
+      // Incluir cambios de metadatos para detectar si vienen del caché
       irrigationLinesRef,
+      { includeMetadataChanges: true },
       (snapshot: QuerySnapshot<DocumentData>) => {
         try {
           // Mapear los documentos a nuestro formato de datos
@@ -45,10 +50,13 @@ export function useIrrigationData(): UseIrrigationDataResult {
               title: data.title || 'Sin título',
               isActive: data.isActive ?? false,
               humidity: data.humidity ?? 0,
+              targetHumidity: typeof data.targetHumidity === 'number' ? data.targetHumidity : undefined,
             };
           });
 
           setLines(irrigationData);
+          // Marcar si los datos provienen del caché (útil para modo offline)
+          setFromCache(snapshot.metadata.fromCache === true);
           setError(null);
         } catch (err) {
           console.error('Error al procesar datos de Firestore:', err);
@@ -71,5 +79,5 @@ export function useIrrigationData(): UseIrrigationDataResult {
     };
   }, []); // Array vacío: el efecto solo se ejecuta una vez al montar
 
-  return { lines, loading, error };
+  return { lines, loading, error, fromCache };
 }

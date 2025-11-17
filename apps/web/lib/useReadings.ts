@@ -66,14 +66,18 @@ export function useReadings(
 
         console.log(`📅 Buscando lecturas desde: ${startDate.toISOString()}`);
 
-        // Referencia a la subcolección de readings del sensor
-        const readingsRef = collection(db, "sensors", sensorId, "readings");
+        // Seleccionar fuente de datos según rango
+        const useHourlyAgg = timeRange !== "24h"; // Para 7d y 30d usar agregados por hora
 
-        // Crear query con ordenamiento (sin filtro de fecha por ahora para evitar problemas)
-        const q = query(
-          readingsRef,
-          orderBy("timestamp", "desc")
-        );
+        // Referencia a la colección adecuada
+        const readingsRef = useHourlyAgg
+          ? collection(db, "sensors", sensorId, "readingsHourly")
+          : collection(db, "sensors", sensorId, "readings");
+
+        // Crear query con ordenamiento
+        const q = useHourlyAgg
+          ? query(readingsRef, orderBy("hour", "desc"))
+          : query(readingsRef, orderBy("timestamp", "desc"));
 
         // Ejecutar la consulta
         const querySnapshot = await getDocs(q);
@@ -85,7 +89,28 @@ export function useReadings(
           .map((doc) => {
             const data = doc.data();
             console.log(`📄 Documento ${doc.id}:`, data);
-            
+
+            // Fuente: agregados horarios
+            if (useHourlyAgg) {
+              const hourId: string | undefined = data.hour;
+              // hourId viene como "YYYY-MM-DD-HH" (UTC) desde la función
+              let ts: Timestamp;
+              if (typeof hourId === "string" && hourId.length >= 13) {
+                const yyyy = parseInt(hourId.slice(0, 4), 10);
+                const mm = parseInt(hourId.slice(5, 7), 10);
+                const dd = parseInt(hourId.slice(8, 10), 10);
+                const HH = parseInt(hourId.slice(11, 13), 10);
+                const date = new Date(Date.UTC(yyyy, mm - 1, dd, HH, 0, 0));
+                ts = Timestamp.fromDate(date);
+              } else {
+                console.warn("⚠️ hourId inválido en agregado horario:", hourId);
+                ts = Timestamp.now();
+              }
+              const avg = typeof data.avg === "number" ? data.avg : 0;
+              return { timestamp: ts, valueVWC: avg };
+            }
+
+            // Fuente: lecturas crudas
             // Manejar diferentes formatos de timestamp
             let timestamp: Timestamp;
             if (data.timestamp instanceof Timestamp) {
@@ -93,17 +118,28 @@ export function useReadings(
               console.log(`✅ Timestamp es instancia de Timestamp`);
             } else if (data.timestamp?.seconds) {
               // Si es un objeto con seconds, convertirlo a Timestamp
-              timestamp = new Timestamp(data.timestamp.seconds, data.timestamp.nanoseconds || 0);
-              console.log(`✅ Timestamp convertido desde objeto: ${timestamp.toDate().toISOString()}`);
+              timestamp = new Timestamp(
+                data.timestamp.seconds,
+                data.timestamp.nanoseconds || 0
+              );
+              console.log(
+                `✅ Timestamp convertido desde objeto: ${timestamp
+                  .toDate()
+                  .toISOString()}`
+              );
             } else {
               // Fallback: usar timestamp actual
-              console.warn('⚠️ Formato de timestamp no reconocido en documento:', doc.id, data);
+              console.warn(
+                "⚠️ Formato de timestamp no reconocido en documento:",
+                doc.id,
+                data
+              );
               timestamp = Timestamp.now();
             }
-            
+
             return {
               timestamp,
-              valueVWC: typeof data.valueVWC === 'number' ? data.valueVWC : 0,
+              valueVWC: typeof data.valueVWC === "number" ? data.valueVWC : 0,
             };
           })
           .filter((reading) => {

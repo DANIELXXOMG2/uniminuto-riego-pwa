@@ -109,7 +109,7 @@ async function cleanInvalidTokens(
 
 export const aggregateSensorReading = onDocumentWritten(
   "sensors/{sensorId}/readings/{readingId}",
-  async (event) => {
+  async (event: any) => {
     const snap = event.data;
     if (!snap || !snap.after.exists) {
       logger.warn("No hay datos posteriores asociados al evento de lectura");
@@ -211,7 +211,7 @@ export const aggregateSensorReading = onDocumentWritten(
  */
 export const onLowHumidityAlert = onDocumentUpdated(
   "irrigationLines/{lineId}",
-  async (event) => {
+  async (event: any) => {
     try {
       const lineId = event.params.lineId;
       const beforeData = event.data?.before.data() as IrrigationLine;
@@ -309,7 +309,7 @@ export const onLowHumidityAlert = onDocumentUpdated(
  */
 export const onIrrigationStatusChange = onDocumentUpdated(
   "irrigationLines/{lineId}",
-  async (event) => {
+  async (event: any) => {
     try {
       const lineId = event.params.lineId;
       const beforeData = event.data?.before.data() as IrrigationLine;
@@ -399,6 +399,138 @@ export const onIrrigationStatusChange = onDocumentUpdated(
       }
     } catch (error) {
       logger.error("Error in onIrrigationStatusChange:", error);
+    }
+  }
+);
+
+/**
+ * 3. FUNCIÓN: Detectar Fallo de Sensores
+ *
+ * Se ejecuta cada hora para verificar sensores que no reportan
+ * Programada con Cloud Scheduler
+ */
+/**
+ * 2B. FUNCIÓN: Notificar Riego Automático por Humedad Objetivo
+ *
+ * Se activa cuando la humedad cruza el umbral de targetHumidity
+ * Detecta inicio y finalización de riego automático
+ */
+export const onAutoIrrigationTarget = onDocumentUpdated(
+  "irrigationLines/{lineId}",
+  async (event: any) => {
+    try {
+      const lineId = event.params.lineId;
+      const beforeData = event.data?.before.data() as IrrigationLine & { targetHumidity?: number };
+      const afterData = event.data?.after.data() as IrrigationLine & { targetHumidity?: number };
+
+      if (!beforeData || !afterData) {
+        return;
+      }
+
+      const targetHumidity = afterData.targetHumidity || 0;
+      
+      // Solo procesar si hay un umbral objetivo configurado
+      if (targetHumidity === 0) {
+        return;
+      }
+
+      const beforeHumidity = beforeData.humidity;
+      const afterHumidity = afterData.humidity;
+      const lineTitle = afterData.title || `Línea ${lineId}`;
+      
+      // Histéresis: activa si < target - 3%, completa si >= target
+      const HYSTERESIS = 3;
+      const lowerThreshold = targetHumidity - HYSTERESIS;
+
+      // Detectar cuando cruza por debajo del umbral (inicia riego automático)
+      const wasAboveTarget = beforeHumidity >= lowerThreshold;
+      const isBelowTarget = afterHumidity < lowerThreshold;
+      const startedAutoIrrigation = wasAboveTarget && isBelowTarget && afterData.isActive;
+
+      // Detectar cuando alcanza el objetivo (finaliza riego automático)
+      const wasBelowTarget = beforeHumidity < targetHumidity;
+      const reachedTarget = afterHumidity >= targetHumidity;
+      const completedAutoIrrigation = wasBelowTarget && reachedTarget;
+
+      if (!startedAutoIrrigation && !completedAutoIrrigation) {
+        return;
+      }
+
+      logger.info(
+        `Auto-irrigation event for ${lineTitle}: started=${startedAutoIrrigation}, completed=${completedAutoIrrigation}`
+      );
+
+      // Obtener tokens de administradores
+      const tokens = await getAdminTokens();
+
+      if (tokens.length === 0) {
+        return;
+      }
+
+      let title: string;
+      let body: string;
+      let notifType: string;
+
+      if (startedAutoIrrigation) {
+        title = "🌱 Riego Automático Iniciado";
+        body = `${lineTitle} necesita agua. Humedad: ${afterHumidity}% (objetivo: ${targetHumidity}%)`;
+        notifType = "auto_irrigation_started";
+      } else {
+        title = "✅ Objetivo Alcanzado";
+        body = `${lineTitle} alcanzó ${afterHumidity}% de humedad (objetivo: ${targetHumidity}%)`;
+        notifType = "auto_irrigation_completed";
+      }
+
+      const message: admin.messaging.MulticastMessage = {
+        notification: {
+          title,
+          body,
+        },
+        data: {
+          type: notifType,
+          lineId: lineId,
+          lineName: lineTitle,
+          humidity: afterHumidity.toString(),
+          targetHumidity: targetHumidity.toString(),
+          timestamp: Date.now().toString(),
+        },
+        tokens: tokens,
+      };
+
+      // Enviar notificación
+      const response = await admin.messaging().sendEachForMulticast(message);
+
+      logger.info(
+        `✅ Auto-irrigation notifications sent: ${response.successCount} successful, ` +
+          `${response.failureCount} failed`
+      );
+
+      // Limpiar tokens inválidos
+      if (response.failureCount > 0) {
+        const invalidTokens: string[] = [];
+        response.responses.forEach((resp, idx) => {
+          if (!resp.success) {
+            const error = resp.error;
+            if (
+              error?.code === "messaging/invalid-registration-token" ||
+              error?.code === "messaging/registration-token-not-registered"
+            ) {
+              invalidTokens.push(tokens[idx]);
+            }
+          }
+        });
+
+        if (invalidTokens.length > 0) {
+          const userDocs = await admin
+            .firestore()
+            .collection("users")
+            .where("role", "==", "admin")
+            .get();
+          await cleanInvalidTokens(invalidTokens, userDocs);
+        }
+      }
+    } catch (error) {
+      logger.error("Error in onAutoIrrigationTarget:", error);
     }
   }
 );
@@ -555,7 +687,7 @@ export const updateUserRole = onCall(
   {
     region: "us-central1",
   },
-  async (request) => {
+  async (request: any) => {
     try {
       // Verificar autenticación
       if (!request.auth) {
@@ -659,7 +791,7 @@ export const deleteUser = onCall(
   {
     region: "us-central1",
   },
-  async (request) => {
+  async (request: any) => {
     try {
       // Verificar autenticación
       if (!request.auth) {

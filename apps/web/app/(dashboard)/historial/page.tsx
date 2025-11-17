@@ -245,6 +245,14 @@ export default function HistorialPage() {
           </Button>
         </div>
 
+        {/* Badge de resolución para rangos largos (7d y 30d) */}
+        {selectedRange !== "24h" && (
+          <div className="w-fit rounded-full border border-border bg-secondary px-2 py-1 text-xs text-muted-foreground inline-flex items-center gap-2">
+            <span className="inline-block h-2 w-2 rounded-full bg-primary" />
+            Resolución: por hora
+          </div>
+        )}
+
         {/* Error State */}
         {error && (
           <div className="bg-red-900/30 border border-red-700 rounded-lg p-4 text-red-200">

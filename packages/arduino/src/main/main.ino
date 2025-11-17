@@ -46,8 +46,10 @@ float vwc[18];
 float promedioLinea[3];
 bool estadoValvula[3] = {false,false,false};
 
-// Umbrales locales (opcional)
-float umbral[3] = {30.0,30.0,30.0};
+// Umbrales remotos por línea y configuración de riego automático
+float targetHumidity[3] = {30.0,30.0,30.0}; // Leídos de Firestore
+bool autoIrrigationEnabled = true; // Interruptor global de riego automático
+const float HYSTERESIS = 3.0; // Banda de seguridad: activa < target-3%, apaga >= target
 
 FirebaseData fbdo; FirebaseData fbdoControl; FirebaseAuth auth; FirebaseConfig config;
 bool wifiConnected=false; bool firebaseReady=false;
@@ -105,6 +107,13 @@ void fetchSystemConfig(){
       Serial.print(F("✅ Intervalo Activo actualizado: "));
       Serial.println(activeSec);
     }
+
+    // Leer interruptor global de riego automático
+    if(doc["fields"].containsKey("autoIrrigationEnabled")){
+      autoIrrigationEnabled = doc["fields"]["autoIrrigationEnabled"]["booleanValue"] | true;
+      Serial.print(F("✅ Riego Automático Global: "));
+      Serial.println(autoIrrigationEnabled ? "ACTIVADO" : "DESACTIVADO");
+    }
   } else {
     Serial.print(F("❌ Error leyendo system/config: "));
     Serial.println(fbdo.errorReason());
@@ -127,7 +136,7 @@ void leerSensores(){
       Serial.printf("  L%d S%03d (mux%d ch%d): %d -> %.2f%%\n", linea+1, sensorGlobal, muxIndex, canal, raw, vwc[sensorGlobal]);
     }
     promedioLinea[linea] = suma / 6.0;
-    Serial.printf("  >> Promedio linea-%d: %.2f%% (umbral %.1f)\n", linea+1, promedioLinea[linea], umbral[linea]);
+    Serial.printf("  >> Promedio linea-%d: %.2f%% (objetivo %.1f%%)\n", linea+1, promedioLinea[linea], targetHumidity[linea]);
   }
 }
 
@@ -144,25 +153,64 @@ void leerControlLineas(){
     String path=lineDocPath(l);
     if(Firebase.Firestore.getDocument(&fbdoControl,FIREBASE_PROJECT_ID,"",path.c_str())){
       FirebaseJson js; js.setJsonData(fbdoControl.payload()); FirebaseJsonData r;
+      
+      // Leer isActive (interruptor manual)
+      bool isActive = false;
       if(js.get(r,"fields/isActive/booleanValue")){
-        bool remoto=r.boolValue; // remoto domina; se puede combinar con umbral según demanda
-        bool activar = remoto && (promedioLinea[l] < umbral[l]);
-        actualizarEstadoValvula(l, activar);
+        isActive = r.boolValue;
       }
+
+      // Leer targetHumidity (umbral objetivo) si existe
+      if(js.get(r,"fields/targetHumidity/integerValue")){
+        int remoteTarget = r.intValue;
+        if(remoteTarget >= 0 && remoteTarget <= 60){
+          targetHumidity[l] = (float)remoteTarget;
+        }
+      }
+
+      // Lógica de control con histéresis
+      // Solo activar riego automático si:
+      // 1. autoIrrigationEnabled (global) está ON
+      // 2. isActive (por línea) está ON
+      // 3. targetHumidity > 0 (si es 0, modo manual puro)
+      // 4. humedad < targetHumidity - HYSTERESIS
+      bool shouldActivate = false;
+      
+      if(autoIrrigationEnabled && isActive && targetHumidity[l] > 0){
+        float lowerThreshold = targetHumidity[l] - HYSTERESIS;
+        
+        // Activar si está por debajo del umbral inferior
+        if(promedioLinea[l] < lowerThreshold){
+          shouldActivate = true;
+        }
+        // Desactivar solo si alcanza o supera el objetivo
+        else if(promedioLinea[l] >= targetHumidity[l]){
+          shouldActivate = false;
+        }
+        // Mantener estado actual si está en zona de histéresis
+        else {
+          shouldActivate = estadoValvula[l];
+        }
+      } else {
+        // Modo manual: solo isActive controla
+        shouldActivate = isActive && (targetHumidity[l] == 0);
+      }
+
+      actualizarEstadoValvula(l, shouldActivate);
     }
   }
 
-  // (Sprint 16) Selección dinámica del intervalo de lectura según estado de válvulas
+  // Selección dinámica del intervalo de lectura según estado de válvulas
   bool anyValveActive = estadoValvula[0] || estadoValvula[1] || estadoValvula[2];
   if(anyValveActive){
     if(currentReadingIntervalMs != activeIrrigationIntervalMs){
-      Serial.println(F("💧 RIEGO ACTIVO. Cambiando a intervalo rápido (5s)."));
+      Serial.println(F("💧 RIEGO ACTIVO. Cambiando a intervalo rápido."));
       currentReadingIntervalMs = activeIrrigationIntervalMs;
-      tLectura = millis(); // Forzar actualización inmediata
+      tLectura = millis();
     }
   } else {
     if(currentReadingIntervalMs != defaultReadingIntervalMs){
-      Serial.println(F("☀️ RIEGO DETENIDO. Cambiando a intervalo normal (5min)."));
+      Serial.println(F("☀️ RIEGO DETENIDO. Cambiando a intervalo normal."));
       currentReadingIntervalMs = defaultReadingIntervalMs;
     }
   }
