@@ -11,8 +11,8 @@ import { useAuth } from './AuthProvider';
 const VAPID_KEY = process.env.NEXT_PUBLIC_FIREBASE_VAPID_KEY || '';
 
 // Debug: Verificar si la VAPID key está presente
-if (typeof window !== 'undefined') {
-  console.log('🔑 VAPID Key present:', VAPID_KEY ? `Yes (${VAPID_KEY.substring(0, 10)}...)` : '❌ NO');
+if (typeof window !== 'undefined' && process.env.NODE_ENV !== 'production') {
+  console.debug('🔑 VAPID Key present:', VAPID_KEY ? 'Yes (hidden)' : '❌ NO');
 }
 
 interface UseFCMResult {
@@ -73,9 +73,9 @@ export function useFCM(onNotificationReceived?: NotificationHandler): UseFCMResu
           fcmTokens: arrayUnion(fcmToken),
           lastTokenUpdate: new Date(),
         });
-        console.log('✅ Token FCM guardado en Firestore');
+        if (process.env.NODE_ENV !== 'production') { console.debug('✅ Token FCM guardado in Firestore'); }
       } else {
-        console.log('ℹ️ Token FCM ya existe en Firestore');
+        if (process.env.NODE_ENV !== 'production') { console.debug('ℹ️ Token FCM ya existe en Firestore'); }
       }
     } catch (err) {
       console.error('❌ Error al guardar token en Firestore:', err);
@@ -102,16 +102,22 @@ export function useFCM(onNotificationReceived?: NotificationHandler): UseFCMResu
       // Solicitar permiso al usuario
       const permission = await Notification.requestPermission();
       
-      if (permission === 'granted') {
-        console.log('✅ Permiso de notificaciones concedido');
+        if (permission === 'granted') {
+        if (process.env.NODE_ENV !== 'production') {
+          console.debug('✅ Permiso de notificaciones concedido');
+        }
 
         // Registrar service worker para FCM
         const registration = await navigator.serviceWorker.register('/firebase-messaging-sw.js');
-        console.log('✅ Service Worker de FCM registrado');
+        if (process.env.NODE_ENV !== 'production') {
+          console.debug('✅ Service Worker de FCM registrado');
+        }
 
         // Esperar a que el Service Worker esté activo
         await navigator.serviceWorker.ready;
-        console.log('✅ Service Worker activado y listo');
+        if (process.env.NODE_ENV !== 'production') {
+          console.debug('✅ Service Worker activado y listo');
+        }
 
         // Obtener instancia de messaging
         const messaging = getMessaging();
@@ -123,7 +129,7 @@ export function useFCM(onNotificationReceived?: NotificationHandler): UseFCMResu
         });
 
         if (fcmToken) {
-          console.log('✅ Token FCM obtenido:', fcmToken.substring(0, 20) + '...');
+          if (process.env.NODE_ENV !== 'production') { console.debug('✅ Token FCM obtenido (redacted)'); }
           setToken(fcmToken);
 
           // Guardar token en Firestore
@@ -157,7 +163,7 @@ export function useFCM(onNotificationReceived?: NotificationHandler): UseFCMResu
 
         // Escuchar mensajes cuando la app está en primer plano
         unsubscribe = onMessage(messaging, (payload: MessagePayload) => {
-          console.log('📨 Mensaje recibido en primer plano:', payload);
+          if (process.env.NODE_ENV !== 'production') { console.debug('📨 Mensaje recibido en primer plano:', payload); }
 
           const title = payload.notification?.title || payload.data?.title || 'Nueva Notificación';
           const body = payload.notification?.body || payload.data?.body || '';

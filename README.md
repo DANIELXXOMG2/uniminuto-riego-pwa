@@ -13,6 +13,14 @@ PWA Offline-First para la supervisión y control de un sistema de riego intelige
 - **Historial y Analítica:** Gráficos con la evolución de las métricas históricas.
 - **Notificaciones Push:** Alertas en tiempo real sobre eventos críticos del sistema.
 
+## 🔒 Seguridad y registros (Logs)
+
+- Por seguridad y para evitar la filtración de claves y tokens, la aplicación no imprime en producción:
+  - La VAPID key ( `NEXT_PUBLIC_FIREBASE_VAPID_KEY` )
+  - Tokens de FCM ni valores parciales de estos
+- El hook `useFCM` ahora solo muestra logs de debug en entornos no productivos (NODE_ENV !== 'production').
+- Si necesitas debug, ejecuta la app en modo desarrollo o revisa logs del servidor; evita copiar tokens o claves al repositorio.
+
 ---
 
 ## 🛠️ Stack Tecnológico

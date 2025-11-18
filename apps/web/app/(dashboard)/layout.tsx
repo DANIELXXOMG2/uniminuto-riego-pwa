@@ -91,9 +91,6 @@ export default function DashboardLayout({
 
   // Log de estado de FCM para debugging
   useEffect(() => {
-    if (token) {
-      console.log("📱 FCM Token disponible");
-    }
     if (fcmError) {
       console.error("❌ Error FCM:", fcmError);
     }
