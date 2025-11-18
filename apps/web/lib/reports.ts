@@ -90,7 +90,15 @@ export async function generateDailyIrrigationSummary() {
 
   // Get irrigation lines for names and targets
   const linesSnap = await getDocs(collection(db, 'irrigationLines'));
-  const lines = linesSnap.docs.map(d => ({ id: d.id, ...(d.data() as any) }));
+  const lines = linesSnap.docs.map(d => {
+    const data = d.data() as Record<string, unknown>;
+    return {
+      id: d.id,
+      title: typeof data.title === 'string' ? data.title : undefined,
+      targetHumidity: typeof data.targetHumidity === 'number' ? data.targetHumidity : undefined,
+      isActive: typeof data.isActive === 'boolean' ? data.isActive : Boolean(data.isActive),
+    };
+  });
 
   // Map sensorId == line.id by convention; if not matching, will still produce empty metrics.
   const table: { title: string; target: number; avg: number; min: number; max: number; active: boolean }[] = [];
