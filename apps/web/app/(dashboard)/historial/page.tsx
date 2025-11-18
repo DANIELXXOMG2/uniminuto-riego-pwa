@@ -13,6 +13,7 @@ import {
 } from "@/components/ui/select";
 import { useReadings } from "@/lib/useReadings";
 import { useSensors } from "@/lib/useSensors";
+import { generateComparativeByLine, generateDailyIrrigationSummary } from "@/lib/reports";
 import {
   LineChart,
   Line,
@@ -132,6 +133,12 @@ export default function HistorialPage() {
             <ArrowLeft className="h-6 w-6" />
           </Button>
           <h1 className="text-2xl font-bold">Historial</h1>
+        </div>
+        {/* PDF actions */}
+        <div className="flex gap-2">
+          <Button variant="outline" onClick={() => generateComparativeByLine('7d')}>PDF Comparativo (7d)</Button>
+          <Button variant="outline" onClick={() => generateComparativeByLine('30d')}>PDF Comparativo (30d)</Button>
+          <Button variant="default" onClick={() => generateDailyIrrigationSummary()}>PDF Resumen Diario</Button>
         </div>
       </header>
 
