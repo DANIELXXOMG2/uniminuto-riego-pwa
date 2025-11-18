@@ -1,8 +1,7 @@
 'use client';
 
-import jsPDF from 'jspdf';
-import autoTable from 'jspdf-autotable';
-import { collection, doc, getDoc, getDocs, orderBy, query, Timestamp } from 'firebase/firestore';
+// Dynamic imports inside functions to avoid SSR issues
+import { collection, getDocs, orderBy, query } from 'firebase/firestore';
 import { db } from './firebase';
 
 export type Range = '7d' | '30d';
@@ -46,13 +45,12 @@ function metricsFrom(values: number[]) {
 }
 
 export async function generateComparativeByLine(range: Range) {
+  if (typeof window === 'undefined') return;
   const days = range === '7d' ? 7 : 30;
   const since = dateNDaysAgo(days);
 
   // read sensors list
   const sensorsSnap = await getDocs(collection(db, 'sensors'));
-
-  const dataRows: Array<{ sensorId: string; title: string; avg: number; min: number; max: number; last: number }>[] = [] as any;
   const rows: { sensorId: string; title: string; avg: number; min: number; max: number; last: number }[] = [];
 
   for (const s of sensorsSnap.docs) {
@@ -65,6 +63,8 @@ export async function generateComparativeByLine(range: Range) {
     rows.push({ sensorId, title, avg: m.avg, min: m.min, max: m.max, last });
   }
 
+  const { default: jsPDF } = await import('jspdf');
+  const { default: autoTable } = await import('jspdf-autotable');
   const doc = new jsPDF({ unit: 'pt', format: 'a4' });
   doc.setFontSize(14);
   doc.text('Historial Comparativo por Línea', 40, 40);
@@ -84,6 +84,7 @@ export async function generateComparativeByLine(range: Range) {
 }
 
 export async function generateDailyIrrigationSummary() {
+  if (typeof window === 'undefined') return;
   const today = new Date();
   today.setHours(0, 0, 0, 0);
 
@@ -92,7 +93,6 @@ export async function generateDailyIrrigationSummary() {
   const lines = linesSnap.docs.map(d => ({ id: d.id, ...(d.data() as any) }));
 
   // Map sensorId == line.id by convention; if not matching, will still produce empty metrics.
-  const rows: Array<{ title: string; target: number; avg: number; min: number; max: number; active: boolean }>[] = [] as any;
   const table: { title: string; target: number; avg: number; min: number; max: number; active: boolean }[] = [];
 
   for (const l of lines) {
@@ -108,6 +108,8 @@ export async function generateDailyIrrigationSummary() {
     });
   }
 
+  const { default: jsPDF } = await import('jspdf');
+  const { default: autoTable } = await import('jspdf-autotable');
   const doc = new jsPDF({ unit: 'pt', format: 'a4' });
   doc.setFontSize(14);
   doc.text('Resumen Diario de Riego', 40, 40);
