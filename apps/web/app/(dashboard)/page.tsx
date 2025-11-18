@@ -122,10 +122,10 @@ export default function DashboardPage() {
         </div>
         {/* Encabezado */}
         <div className="space-y-2">
-          <h2 className="text-2xl font-bold text-gray-900">
+          <h2 className="text-2xl font-bold text-foreground">
             Dashboard Principal
           </h2>
-          <p className="text-gray-600">
+          <p className="text-muted-foreground">
             Monitorea y controla tus líneas de riego en tiempo real
           </p>
         </div>
@@ -145,7 +145,7 @@ export default function DashboardPage() {
 
         {/* Skeleton de Líneas de Riego */}
         <div className="space-y-4">
-          <h3 className="text-lg font-semibold text-gray-900">
+          <h3 className="text-lg font-semibold text-foreground">
             Líneas de Riego
           </h3>
           <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
@@ -176,10 +176,10 @@ export default function DashboardPage() {
       <div className="space-y-6">
         {/* Encabezado */}
         <div className="space-y-2">
-          <h2 className="text-2xl font-bold text-gray-900">
+          <h2 className="text-2xl font-bold text-foreground">
             Dashboard Principal
           </h2>
-          <p className="text-gray-600">
+          <p className="text-muted-foreground">
             Monitorea y controla tus líneas de riego en tiempo real
           </p>
         </div>
@@ -268,10 +268,10 @@ export default function DashboardPage() {
 
       {/* Encabezado */}
       <div className="space-y-2">
-        <h2 className="text-2xl font-bold text-gray-900">
+        <h2 className="text-2xl font-bold text-foreground">
           Dashboard Principal
         </h2>
-        <p className="text-gray-600">
+        <p className="text-muted-foreground">
           Monitorea y controla tus líneas de riego en tiempo real
         </p>
       </div>
@@ -279,23 +279,23 @@ export default function DashboardPage() {
       {/* Estadísticas Rápidas */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-200">
-          <p className="text-sm text-gray-600">Total Líneas</p>
-          <p className="text-2xl font-bold text-gray-900">{lines.length}</p>
+          <p className="text-sm text-muted-foreground">Total Líneas</p>
+          <p className="text-2xl font-bold text-foreground">{lines.length}</p>
         </div>
         <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-200">
-          <p className="text-sm text-gray-600">Activas</p>
+          <p className="text-sm text-muted-foreground">Activas</p>
           <p className="text-2xl font-bold text-green-600">
             {lines.filter((l) => l.isActive).length}
           </p>
         </div>
         <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-200">
-          <p className="text-sm text-gray-600">Inactivas</p>
+          <p className="text-sm text-muted-foreground">Inactivas</p>
           <p className="text-2xl font-bold text-gray-400">
             {lines.filter((l) => !l.isActive).length}
           </p>
         </div>
         <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-200">
-          <p className="text-sm text-gray-600">Humedad Prom.</p>
+          <p className="text-sm text-muted-foreground">Humedad Prom.</p>
           <p className="text-2xl font-bold text-blue-600">
             {Math.round(
               lines.reduce((acc, l) => acc + l.humidity, 0) / lines.length
@@ -304,7 +304,7 @@ export default function DashboardPage() {
           </p>
         </div>
         <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-200">
-          <p className="text-sm text-gray-600">Sensores Totales</p>
+          <p className="text-sm text-muted-foreground">Sensores Totales</p>
           <p className="text-2xl font-bold text-purple-600">
             {sensorsLoading ? "..." : sensorsError ? "Error" : sensors.length}
           </p>
@@ -327,9 +327,9 @@ export default function DashboardPage() {
               </div>
             </div>
             <Switch
-              checked={config?.autoIrrigationEnabled ?? true}
+              checked={Boolean(config?.autoIrrigationEnabled)}
               onCheckedChange={handleAutoIrrigationToggle}
-              disabled={!config}
+              disabled={false}
             />
           </div>
         </div>
@@ -337,7 +337,7 @@ export default function DashboardPage() {
 
       {/* Líneas de Riego */}
       <div className="space-y-4">
-        <h3 className="text-lg font-semibold text-gray-900">Líneas de Riego</h3>
+        <h3 className="text-lg font-semibold text-foreground">Líneas de Riego</h3>
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
           {lines.map((line) => (
             <IrrigationLineCard
