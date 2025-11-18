@@ -142,8 +142,9 @@ export default function IrrigationLineCard({
             <Switch
               checked={isEffectivelyIrrigating}
               onCheckedChange={onToggle}
-              disabled={disabled || shouldAutoIrrigate}
+              disabled={disabled}
               aria-label={`Activar/Desactivar ${title}`}
+              title={shouldAutoIrrigate ? 'Auto activo: el sistema puede volver a encender' : ''}
             />
             {shouldAutoIrrigate && (
               <span className="text-[10px] text-green-600 font-medium">Auto</span>
