@@ -4,7 +4,7 @@ import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Switch } from "@/components/ui/switch";
 import { Input } from "@/components/ui/input";
 import { Droplet, Activity, Zap, Hand, AlertTriangle } from "lucide-react";
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 
 interface IrrigationLineCardProps {
   title: string;
@@ -31,6 +31,12 @@ export default function IrrigationLineCard({
 }: IrrigationLineCardProps) {
   const [localTarget, setLocalTarget] = useState(targetHumidity);
   const [showWarning, setShowWarning] = useState(false);
+  const debounceTimerRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Sincronizar localTarget cuando targetHumidity cambie desde fuera
+  useEffect(() => {
+    setLocalTarget(targetHumidity);
+  }, [targetHumidity]);
 
   // Determinar modo: automático o manual
   const isAutoMode = autoIrrigationEnabled && targetHumidity > 0;
@@ -39,12 +45,33 @@ export default function IrrigationLineCard({
   const needsWater = isAutoMode && humidity < targetHumidity;
   const isNearTarget = isAutoMode && humidity >= (targetHumidity - 5) && humidity < targetHumidity;
 
+  // Función para guardar el valor con debounce
+  const saveTargetHumidity = (value: number) => {
+    if (debounceTimerRef.current) {
+      clearTimeout(debounceTimerRef.current);
+    }
+
+    debounceTimerRef.current = setTimeout(() => {
+      if (onTargetHumidityChange) {
+        onTargetHumidityChange(value);
+      }
+    }, 800); // Espera 800ms después del último cambio
+  };
+
   const handleSliderChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = parseInt(e.target.value, 10);
     setLocalTarget(value);
     setShowWarning(value > 60);
+    saveTargetHumidity(value);
+  };
+
+  // Para el slider: guardar cuando se suelta el mouse
+  const handleSliderMouseUp = () => {
+    if (debounceTimerRef.current) {
+      clearTimeout(debounceTimerRef.current);
+    }
     if (onTargetHumidityChange) {
-      onTargetHumidityChange(value);
+      onTargetHumidityChange(localTarget);
     }
   };
 
@@ -53,11 +80,18 @@ export default function IrrigationLineCard({
     if (!isNaN(value) && value >= 0 && value <= 60) {
       setLocalTarget(value);
       setShowWarning(value > 60);
-      if (onTargetHumidityChange) {
-        onTargetHumidityChange(value);
-      }
+      saveTargetHumidity(value);
     }
   };
+
+  // Limpiar timer al desmontar
+  useEffect(() => {
+    return () => {
+      if (debounceTimerRef.current) {
+        clearTimeout(debounceTimerRef.current);
+      }
+    };
+  }, []);
 
   return (
     <Card className={`overflow-hidden hover:shadow-lg transition-shadow ${disabled ? 'opacity-75' : ''}`}>
@@ -153,6 +187,8 @@ export default function IrrigationLineCard({
               max="60"
               value={localTarget}
               onChange={handleSliderChange}
+              onMouseUp={handleSliderMouseUp}
+              onTouchEnd={handleSliderMouseUp}
               disabled={disabled}
               className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-primary"
             />
