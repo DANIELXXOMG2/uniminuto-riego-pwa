@@ -10,6 +10,11 @@ import { useAuth } from './AuthProvider';
 // La encuentras en: Consola Firebase -> Cloud Messaging -> Certificados de clave web
 const VAPID_KEY = process.env.NEXT_PUBLIC_FIREBASE_VAPID_KEY || '';
 
+// Debug: Verificar si la VAPID key está presente
+if (typeof window !== 'undefined') {
+  console.log('🔑 VAPID Key present:', VAPID_KEY ? `Yes (${VAPID_KEY.substring(0, 10)}...)` : '❌ NO');
+}
+
 interface UseFCMResult {
   token: string | null;
   loading: boolean;
