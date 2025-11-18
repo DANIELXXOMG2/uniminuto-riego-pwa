@@ -13,7 +13,7 @@ import {
   onDocumentWritten,
 } from "firebase-functions/v2/firestore";
 import { onSchedule } from "firebase-functions/v2/scheduler";
-import { onCall, HttpsError } from "firebase-functions/v2/https";
+import { onCall, HttpsError, CallableRequest } from "firebase-functions/v2/https";
 import * as admin from "firebase-admin";
 import * as logger from "firebase-functions/logger";
 import { FieldValue } from "firebase-admin/firestore";
@@ -109,14 +109,14 @@ async function cleanInvalidTokens(
 
 export const aggregateSensorReading = onDocumentWritten(
   "sensors/{sensorId}/readings/{readingId}",
-  async (event: any) => {
+  async (event) => {
     const snap = event.data;
     if (!snap || !snap.after.exists) {
       logger.warn("No hay datos posteriores asociados al evento de lectura");
       return;
     }
 
-    const data: SensorReading = snap.after.data();
+    const data: SensorReading = snap.after.data() as SensorReading;
 
     const valueVWC = data.valueVWC;
     if (typeof valueVWC !== "number" || isNaN(valueVWC)) {
@@ -211,7 +211,7 @@ export const aggregateSensorReading = onDocumentWritten(
  */
 export const onLowHumidityAlert = onDocumentUpdated(
   "irrigationLines/{lineId}",
-  async (event: any) => {
+  async (event) => {
     try {
       const lineId = event.params.lineId;
       const beforeData = event.data?.before.data() as IrrigationLine;
@@ -309,7 +309,7 @@ export const onLowHumidityAlert = onDocumentUpdated(
  */
 export const onIrrigationStatusChange = onDocumentUpdated(
   "irrigationLines/{lineId}",
-  async (event: any) => {
+  async (event) => {
     try {
       const lineId = event.params.lineId;
       const beforeData = event.data?.before.data() as IrrigationLine;
@@ -417,7 +417,7 @@ export const onIrrigationStatusChange = onDocumentUpdated(
  */
 export const onAutoIrrigationTarget = onDocumentUpdated(
   "irrigationLines/{lineId}",
-  async (event: any) => {
+  async (event) => {
     try {
       const lineId = event.params.lineId;
       const beforeData = event.data?.before.data() as IrrigationLine & { targetHumidity?: number };
@@ -687,7 +687,7 @@ export const updateUserRole = onCall(
   {
     region: "us-central1",
   },
-  async (request: any) => {
+  async (request: CallableRequest<{ userId: string; newRole: string }>) => {
     try {
       // Verificar autenticación
       if (!request.auth) {
@@ -791,7 +791,7 @@ export const deleteUser = onCall(
   {
     region: "us-central1",
   },
-  async (request: any) => {
+  async (request: CallableRequest<{ userId: string }>) => {
     try {
       // Verificar autenticación
       if (!request.auth) {
