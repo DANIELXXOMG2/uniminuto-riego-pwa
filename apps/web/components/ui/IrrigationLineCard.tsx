@@ -41,7 +41,13 @@ export default function IrrigationLineCard({
   // Determinar modo: automático o manual
   const isAutoMode = autoIrrigationEnabled && targetHumidity > 0;
 
-  // Calcular estado de riego automático
+  // Calcular estado de riego automático (con histéresis del 3%)
+  const HYSTERESIS = 3;
+  const shouldAutoIrrigate = isAutoMode && humidity < (targetHumidity - HYSTERESIS);
+  
+  // Estado efectivo de riego (manual O automático)
+  const isEffectivelyIrrigating = isActive || shouldAutoIrrigate;
+  
   const needsWater = isAutoMode && humidity < targetHumidity;
   const isNearTarget = isAutoMode && humidity >= (targetHumidity - 5) && humidity < targetHumidity;
 
@@ -100,12 +106,12 @@ export default function IrrigationLineCard({
           <div className="flex items-center gap-2">
             <div
               className={`p-2 rounded-lg ${
-                isActive ? (isAutoMode ? "bg-green-100" : "bg-blue-100") : "bg-gray-100"
+                isEffectivelyIrrigating ? (shouldAutoIrrigate ? "bg-green-100" : "bg-blue-100") : "bg-gray-100"
               }`}
             >
               <Droplet
                 className={`w-5 h-5 ${
-                  isActive ? (isAutoMode ? "text-green-600" : "text-blue-600") : "text-gray-400"
+                  isEffectivelyIrrigating ? (shouldAutoIrrigate ? "text-green-600" : "text-blue-600") : "text-gray-400"
                 }`}
               />
             </div>
@@ -120,22 +126,29 @@ export default function IrrigationLineCard({
               </div>
               <div className="flex items-center gap-1.5 mt-0.5">
                 <Activity
-                  className={`w-3.5 h-3.5 ${isActive ? "text-green-500" : "text-gray-400"}`}
+                  className={`w-3.5 h-3.5 ${isEffectivelyIrrigating ? "text-green-500" : "text-gray-400"}`}
                 />
                 <span
-                  className={`text-xs font-medium ${isActive ? "text-green-600" : "text-gray-500"}`}
+                  className={`text-xs font-medium ${isEffectivelyIrrigating ? "text-green-600" : "text-gray-500"}`}
                 >
-                  {isActive ? "Regando" : "Detenida"}
+                  {isEffectivelyIrrigating 
+                    ? (shouldAutoIrrigate ? "Regando (Auto)" : "Regando (Manual)") 
+                    : "Detenida"}
                 </span>
               </div>
             </div>
           </div>
-          <Switch
-            checked={isActive}
-            onCheckedChange={onToggle}
-            disabled={disabled}
-            aria-label={`Activar/Desactivar ${title}`}
-          />
+          <div className="flex flex-col items-end gap-1">
+            <Switch
+              checked={isEffectivelyIrrigating}
+              onCheckedChange={onToggle}
+              disabled={disabled || shouldAutoIrrigate}
+              aria-label={`Activar/Desactivar ${title}`}
+            />
+            {shouldAutoIrrigate && (
+              <span className="text-[10px] text-green-600 font-medium">Auto</span>
+            )}
+          </div>
         </div>
       </CardHeader>
 

@@ -1,0 +1,86 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // --- FUNCIONES HELPER ---
+    
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+    
+    // Helper seguro: Verifica si existe el doc antes de pedir .data
+    // Esto evita el crash cuando un usuario nuevo se está registrando
+    function getUserData() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
+    }
+    
+    function isUserDocExisting() {
+      return exists(/databases/$(database)/documents/users/$(request.auth.uid));
+    }
+
+    function isAdmin() {
+      return isAuthenticated() && 
+             isUserDocExisting() && 
+             getUserData().role == 'admin';
+    }
+    
+    function isAdminOrSupervisor() {
+      return isAuthenticated() && 
+             isUserDocExisting() && 
+             getUserData().role in ['admin', 'supervisor'];
+    }
+    
+    // --- REGLAS POR COLECCIÓN ---
+
+    // 1. USUARIOS 👤
+    match /users/{userId} {
+      // Permitir que el usuario cree/lea/escriba su propio documento
+      // O que un admin (si existe su doc) pueda leer/escribir cualquier usuario
+      allow read, write: if isAuthenticated() && 
+                            (request.auth.uid == userId || 
+                            (isUserDocExisting() && isAdmin()));
+    }
+    
+    // 2. LÍNEAS DE RIEGO 💧
+    match /irrigationLines/{lineId} {
+      allow read: if isAuthenticated();
+      allow write: if isAdminOrSupervisor();
+    }
+    
+    // 3. SENSORES Y LECTURAS 🌡️
+    match /sensors/{sensorId} {
+      allow read: if isAuthenticated();
+      allow write: if isAdminOrSupervisor();
+      
+      match /readings/{readingId} {
+        allow read: if isAuthenticated();
+        allow write: if isAdminOrSupervisor();
+      }
+      
+      match /readingsHourly/{hourId} {
+        allow read: if isAuthenticated();
+        allow write: if isAdminOrSupervisor();
+      }
+    }
+    
+    // 4. CONFIGURACIÓN DEL SISTEMA ⚙️
+    match /system/{docId} {
+      allow read: if isAuthenticated();
+      allow write: if isAdmin();
+    }
+    
+    // 5. NOTIFICACIONES 🔔
+    match /notifications/{notificationId} {
+      // Solo el dueño de la notificación o un admin pueden leerla
+      allow read: if isAuthenticated() && (resource.data.userId == request.auth.uid || isAdmin());
+      // Solo el sistema (vía Admin SDK) o admins pueden crear/borrar
+      allow write: if isAdmin();
+    }
+    
+    // 6. LOGS 📝
+    match /logs/{logId} {
+      allow read, write: if isAdmin();
+    }
+  }
+}
